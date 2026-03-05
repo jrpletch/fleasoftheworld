@@ -1,0 +1,29 @@
+taxa_page:
+  overview:
+    panels:
+      - - - panel:gallery
+          - panel:type
+          - panel:type-specimen
+          - panel:nomenclature
+          - panel:nomenclature-references
+
+        - - panel:map
+          - panel:descendants
+          - panel:content
+          - panel:keys
+          - panel:etymology
+          - panel:gbif
+          - panel:statistics
+
+  specimen_records:
+    rank_group: ['SpeciesGroup']
+    panels:
+      - - - panel:specimen-records
+  
+  biological_associations:
+    panels:
+      - - - panel:biological-associations
+      
+  bibliography:
+    panels:
+      - - - panel:nomenclature-references 
