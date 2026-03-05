@@ -13,3 +13,6 @@
 !public/**
 !README.md
 config/**/*.development.yml
+public/flea-news
+pages/old
+pages/old/**
