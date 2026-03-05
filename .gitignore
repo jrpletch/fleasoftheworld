@@ -16,3 +16,5 @@ config/**/*.development.yml
 public/flea-news
 pages/old
 pages/old/**
+public/images
+public/images/**
