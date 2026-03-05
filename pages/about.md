@@ -2,13 +2,22 @@
 title: About
 contact_email: user@example.com
 copyright: All content is CC 0 so that it maybe be shared throughout the world in places like Wikipedia.
-citation: Project collaborative. 2022. Website title. Available at https://example.com. 
+citation: Fleas of the World. 2022. Website title. Available at https://example.com. 
 ---
 
 # {{frontmatter.title}}
 
 ## Dig deeper
 Please contact us if you need extended access to the data underlying here. The TaxonWorks interfaces used to curate these data include wide range of additional filtering, reporting, and curatorial functionality. With a little training from us we'd be happy to provide you access to this additional functionality. Over time we expect this site to gradually mirror that extended functionality.
+
+## Data sources
+This database brings together several datasets on flea taxonomy and biology and presents them as a unified, searchable, and publically accessible database.
+
+The <b>Robert E. Lewis World Species (Flea) List</b> (LWSL) maintained by Michael Hastriter and Robert Bossard is the authoritative source for flea taxonomy. Robert E. Lewis began compiling a list of flea species in XXXX and informally distributed them to flea researchers along with <i>Flea News</i>. After Lewis's death, Michael Hastriter and Robert Bossard converted the LWSL into an Excel spreadsheet. The list tracks valid species of Siphonaptera and synonymies.
+
+The <b>PARHOST</b> database compiled by Sergei Medvedev aggregates host association records and geographic distribution for the majority of flea species.
+
+<b><i>[Flea News](/FleaNews)</i></b> is an important source of bibliographic information on fleas, tracking papers published on fleas twice yearly since 1974.
 
 ## Contact
 If you have a question, want to report new data relevant to the project, or have error our preferred means of contact is to file an issue on our [project tracker](https://github.com/our/project/tracker). You can also [chat live with us](https://slackservername). We can also be reached via [email](mailto:{{frontmatter.contact_email}}).   
