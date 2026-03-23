@@ -7,7 +7,7 @@ taxa_page:
           - panel:nomenclature
           - panel:nomenclature-references
 
-        - - panel:map
+        - - panel:map-v2
           - panel:descendants
           - panel:content
           - panel:keys
@@ -26,4 +26,4 @@ taxa_page:
       
   bibliography:
     panels:
-      - - - panel:nomenclature-references 
+      - - - panel:nomenclature-references

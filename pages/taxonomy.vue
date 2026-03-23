@@ -7,7 +7,7 @@
 		<div class="flex flex-col md:flex-row gap-6">
 		  <div class="flex-1">
 			<PanelDescendants
-			  :otuId="1702331"
+			  :otuId="1366469"
 			  title="Explore flea taxonomy" />
 		  </div>
 
