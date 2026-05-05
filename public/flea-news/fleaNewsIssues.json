@@ -1,0 +1,32 @@
+[
+	{
+		"year": 1974,
+		"issue": 1,
+		"editor": "F.G.A.M. Smit",
+		"pdf": "public/flea-news/flea-news-1-1974-feb.pdf"
+	},
+	{
+		"year": 1974,
+		"issue": 2,
+		"editor": "F.G.A.M. Smit",
+		"pdf": "public/flea-news/flea-news-2-1974-may.pdf"
+	},
+	{
+		"year": 1974,
+		"issue": 3,
+		"editor": "F.G.A.M. Smit",
+		"pdf": "public/flea-news/flea-news-3-1974-sep.pdf"
+	},
+	{
+		"year": 1990,
+		"issue": 41,
+		"editor": "Robert E. Lewis",
+		"pdf": "public/flea-news/flea-news-41-1990-dec.pdf"
+	},
+	{
+		"year": 2013,
+		"issue": 73,
+		"editor": "Robert Bossard",
+		"pdf": "public/flea-news/flea-news-73-2013-dec.pdf"
+	}
+]

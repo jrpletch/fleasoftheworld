@@ -9,6 +9,9 @@
 #      link: /news
     - label: Taxonomy
       link: /taxonomy
+      
+    - label: Checklists
+      link: /checklists
 
     - label: Morphology
       link: /

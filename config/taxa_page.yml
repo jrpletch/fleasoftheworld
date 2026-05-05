@@ -3,7 +3,7 @@ taxa_page:
     panels:
       - - - panel:gallery
           - panel:type
-          - panel:type-specimen
+          - panel:type-specimen-v2
           - panel:nomenclature
           - panel:nomenclature-references
 
@@ -15,6 +15,11 @@ taxa_page:
           - panel:gbif
           - panel:statistics
 
+  asserted_distributions:
+    panels:
+     - - - panel:map-v2
+     - - - panel:asserted-distributions
+     
   specimen_records:
     rank_group: ['SpeciesGroup']
     panels:
@@ -22,7 +27,7 @@ taxa_page:
   
   biological_associations:
     panels:
-      - - - panel:biological-associations
+      - - - panel:biological-associations-v2
       
   bibliography:
     panels:
