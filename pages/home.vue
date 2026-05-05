@@ -2,7 +2,7 @@
   <section>
     <figure class="relative w-full h-[500px] sm:h-[500px] overflow-visible m-0">
 		<img
-			src="../images/NK317589.F1_Mesopsylla_habitus.png"
+			src="../public/images/NK317589.F1_Mesopsylla_habitus.png"
 			alt="NK317589.F1 Mesopsylla hebes"
 			class="w-full h-96 sm:h-[500px] object-cover"
 		/>
