@@ -13,7 +13,7 @@
 
 		  <div class="flex-1">
 			<PanelDescendants
-			  :otuId="1702978"
+			  :otuId="1543683"
 			  title="Explore host taxonomy" />
 		  </div>
 		</div>
