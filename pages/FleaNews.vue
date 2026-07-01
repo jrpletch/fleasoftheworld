@@ -156,7 +156,7 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
-import issues from '/public/flea-news/fleaNewsIssuesWithText.json'
+import issues from './data/fleaNewsIssuesWithText.json'
 
 const searchInput = ref('')
 const searchQuery = ref('')
