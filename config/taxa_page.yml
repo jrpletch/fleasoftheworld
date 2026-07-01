@@ -3,11 +3,11 @@ taxa_page:
     panels:
       - - - panel:gallery
           - panel:type
-          - panel:type-specimen-v2
+          - panel:type-specimen
           - panel:nomenclature
           - panel:nomenclature-references
 
-        - - panel:map-v2
+        - - panel:map
           - panel:descendants
           - panel:content
           - panel:keys
@@ -17,7 +17,7 @@ taxa_page:
 
   asserted_distributions:
     panels:
-     - - - panel:map-v2
+     - - - panel:map
      - - - panel:asserted-distributions
      
   specimen_records:
@@ -27,7 +27,7 @@ taxa_page:
   
   biological_associations:
     panels:
-      - - - panel:biological-associations-v2
+      - - - panel:biological-associations
       
   bibliography:
     panels:
