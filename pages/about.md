@@ -2,7 +2,7 @@
 title: About
 contact_email: user@example.com
 copyright: All content is CC 0 so that it maybe be shared throughout the world in places like Wikipedia.
-citation: Fleas of the World. 2022. Website title. Available at https://example.com. 
+citation: Pletcher, J.R., M.W. Hastriter, R. Bossard, S.G. Medvedev, M.L. Kwak, & L.A. Durden. 2026. Fleas of the World. Accessed [insert date here]. Available at https://jrpletch.github.io/fleasoftheworld/#/.
 ---
 
 # {{frontmatter.title}}
@@ -13,23 +13,27 @@ Please contact us if you need extended access to the data underlying here. The T
 ## Data sources
 This database brings together several datasets on flea taxonomy and biology and presents them as a unified, searchable, and publically accessible database.
 
-The <b>Robert E. Lewis World Species (Flea) List</b> (LWSL) maintained by Michael Hastriter and Robert Bossard is the authoritative source for flea taxonomy. Robert E. Lewis began compiling a list of flea species in XXXX and informally distributed them to flea researchers along with <i>Flea News</i>. After Lewis's death, Michael Hastriter and Robert Bossard converted the LWSL into an Excel spreadsheet. The list tracks valid species of Siphonaptera and synonymies.
+The <b>Robert E. Lewis World Species (Flea) List</b> (LWSL) maintained by Michael Hastriter and Robert Bossard is the authoritative source for flea taxonomy. Robert E. Lewis began compiling a list of flea species in 1980 and informally distributed them to flea researchers along with <i>Flea News</i>. After Lewis's death, Michael Hastriter and Robert Bossard converted the LWSL into an Excel spreadsheet. The list tracks valid species of Siphonaptera and synonymies.
 
 The <b>PARHOST</b> database compiled by Sergei Medvedev aggregates host association records and geographic distribution for the majority of flea species.
 
 <b><i>[Flea News](/FleaNews)</i></b> is an important source of bibliographic information on fleas, tracking papers published on fleas twice yearly since 1974.
 
+The <b>Illustrated Catalogues of the Rothschild Collection of Fleas</b> (1953-1983) are the most comprehensive published source on global flea diversity. Though out of date, the compilation of records from the British Museum alongside numerous keys, figures, and taxonomic diagnoses make them an essential source on Siphonaptera.
+
 ## Contact
-If you have a question, want to report new data relevant to the project, or have error our preferred means of contact is to file an issue on our [project tracker](https://github.com/our/project/tracker). You can also [chat live with us](https://slackservername). We can also be reached via [email](mailto:{{frontmatter.contact_email}}).   
+If you have a question, want to report new data relevant to the project, or have error our preferred means of contact is to file an issue on our [project tracker](https://github.com/our/project/tracker).
 
 ## Team
  _Please contact us if you would like to join this effort._
 
 Made possible by the wonderful:
-* Gandalf - Technical lead
-* Aragorn - Outside advisor 
-* Frodo - Lead curator
-* Samwise - Emotional support
+* Josh R. Pletcher
+* Mike Hastriter
+* Bob Bossard
+* Sergei Medvedev
+* Mackenzie Kwak
+* Lance Durden
 
 ## Citing
 * This website - {{frontmatter.citation}}

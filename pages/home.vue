@@ -31,15 +31,15 @@
 	</figure>
  </section>
  
-<section class="py-5 bg-gray-50"> 
+<section class="py-5 bg-base-background"> 
   <div class="max-w-6xl mx-auto px-6">
-	<p class="text-lg leading-relaxed text-gray-700">
+	<p class="text-lg leading-relaxed">
 				Fleas are ectoparasitic holometabolous insects in the Order Siphonaptera. Several species of fleas are important in human and veterinary medicine, most notably as vectors of plague. Fleas are found on all seven continents, including Antarctica, and are primarily associated with small mammals. Other species of fleas are associated with birds, humans, carnivorans and ungulates. Unlike other ectoparasitic insects such as lice, many species of fleas spend a significant amount of time off the host in burrows or nests.
 	</p>
   </div>
  </section>
  
- <section class="bg-gray-50 py-auto">
+ <section class="bg-base-background py-auto">
 	<div class="max-w-6xl mx-auto px-6 grid grid-cols-1 sm:grid-cols-3 gap-auto text-center">
 		<!-- Species statistic -->
 		<SpeciesCount />

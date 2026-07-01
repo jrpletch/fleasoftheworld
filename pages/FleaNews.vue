@@ -12,9 +12,9 @@
 
     <!-- About Section -->
     <div class="max-w-5xl mx-auto px-6 py-5 space-y-8">
-      <div class="bg-white rounded-xl shadow p-8">
+      <div class="bg-base-foreground rounded-xl shadow p-8">
         <h2 class="text-2xl font-semibold mb-4">About <i>Flea News</i></h2>
-        <p class="text-gray-700 leading-relaxed">
+        <p class="leading-relaxed">
           <i>Flea News</i> is a biannual newsletter, mainly bibliographic in nature, covering recent publications about or relating to fleas. 
           It was first published in 1974 by F.G.A.M. Smit who continued to publish it until his retirement in 1980. 
           Robert E. Lewis edited <i>Flea News</i> between 1980 and 2000. 
@@ -30,7 +30,7 @@
         <select
           id="year-select"
           v-model="selectedYear"
-          class="p-2 border rounded border-gray-300 focus:ring-2 focus:ring-black"
+          class="p-2 border rounded border-gray-300 bg-base-foreground focus:ring-2 focus:ring-black"
         >
           <option value="">All Years</option>
           <option v-for="year in uniqueYears" :key="year" :value="year">
@@ -43,7 +43,7 @@
         v-model="searchInput"
         type="text"
         placeholder="Search by text..."
-        class="w-full sm:w-64 p-2 rounded border border-gray-300 focus:outline-none focus:ring-2 focus:ring-black"
+        class="w-full sm:w-64 p-2 rounded border border-gray-300 bg-base-foreground focus:outline-none focus:ring-2 focus:ring-black"
       />
     </div>
 
@@ -59,7 +59,7 @@
         :key="`${issue.year}-${issue.month}-${issue.issue}`"
         :href="issue.pdf"
         target="_blank"
-        class="bg-white rounded-xl shadow p-4 flex flex-col hover:shadow-lg hover:-translate-y-1 transition transform cursor-pointer focus:outline-none focus:ring-2 focus:ring-black"
+        class="bg-base-foreground rounded-xl shadow p-4 flex flex-col hover:shadow-lg hover:-translate-y-1 transition transform cursor-pointer focus:outline-none focus:ring-2 focus:ring-black"
       >
         <img
           v-if="issue.thumbnail"
@@ -84,7 +84,7 @@
       <button
         @click="currentPage--"
         :disabled="currentPage === 1"
-        class="px-3 py-1 border rounded bg-white hover:bg-gray-200 disabled:opacity-40">
+        class="px-3 py-1 border rounded bg-base-background hover:bg-gray-200 disabled:opacity-40">
         Previous
       </button>
 
@@ -93,14 +93,16 @@
         :key="page"
         @click="currentPage = page"
         class="px-3 py-1 border rounded"
-        :class="page === currentPage ? 'bg-black text-white' : 'bg-white text-black hover:bg-gray-200'">
+        :class="page === currentPage
+			? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+			: 'bg-base-background hover:bg-gray-200'">
         {{ page }}
       </button>
 
       <button
         @click="currentPage++"
         :disabled="currentPage === totalPages"
-        class="px-3 py-1 border rounded bg-white hover:bg-gray-200 disabled:opacity-40">
+        class="px-3 py-1 border rounded bg-base-background hover:bg-gray-200 disabled:opacity-40">
         Next
       </button>
     </div>
@@ -118,7 +120,7 @@
       >
         <div class="flex items-center justify-between">
           <div>
-            <span class="font-semibold">
+            <span class="text-black font-semibold">
               {{ row.year }} {{ row.month }} · Number {{ row.issue }}
             </span>
             <span class="text-gray-500 ml-2">

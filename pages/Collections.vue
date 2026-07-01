@@ -1,5 +1,5 @@
 <template>
-  <section class="py-12 bg-gray-50 min-h-screen">
+  <section class="py-12 bg-base-background min-h-screen">
     <div class="container mx-auto">
       <h1 class="text-3xl sm:text-4xl font-bold text-center mb-8">
         Major Flea Collections
@@ -20,8 +20,8 @@
             :alt="collection.name"
             class="max-w-full max-h-32 object-contain mb-4"
           />
-          <h2 class="text-lg font-semibold text-center">{{ collection.name }}</h2>
-          <h3 class="text-md font-semibold text-center">{{ collection.institution }}</h3>
+          <h2 class="text-lg text-black font-semibold text-center">{{ collection.name }}</h2>
+          <h3 class="text-md text-black font-semibold text-center">{{ collection.institution }}</h3>
 		  <p class="text-sm text-gray-500 text-center">{{ collection.location }}</p>
         </a>
       </div>
