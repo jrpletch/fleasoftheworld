@@ -24,7 +24,7 @@ onMounted(() => {
 				per: 1,
 				validity: true,
 				rank: ['NomenclaturalRank::Iczn::SpeciesGroup::Species'],
-				taxon_name_id: [2708444],
+				taxon_name_id: [1543683],
 				descendants: true
 			}
 		}).then((response) => {
