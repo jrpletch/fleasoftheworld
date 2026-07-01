@@ -2,7 +2,7 @@
   <section>
 
     <!-- Hero Header -->
-    <div class="bg-gray-50 py-10">
+    <div class="bg-base-background py-10">
       <div class="max-w-5xl mx-auto px-6 text-center">
         <h1 class="text-4xl sm:text-5xl font-bold mb-4">
           <i>Flea News</i>
