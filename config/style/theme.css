@@ -1,46 +1,46 @@
 :root {
-  --color-primary: 54, 122, 150;
-  --color-primary-content: 255, 255, 255;
+  --tp-primary: rgb(54, 122, 150);
+  	--tp-primary-content: rgb(255, 255, 255);
 
-  --color-secondary: 3, 105, 161;
-  --color-secondary-content: 255, 255, 255;
+  --tp-secondary: rgb(3, 105, 161);
+  --tp-secondary-content: rgb(255, 255, 255);
 
-  --color-base-foreground: 255, 255, 255;
-  --color-base-background: 245, 247, 251;
-  --color-base-muted: 226, 232, 240;
-  --color-base-soft: 156, 163, 175;
-  --color-base-lighter: 55, 65, 81;
-  --color-base-border: 203, 213, 225;
-  --color-base-content: 0, 0, 0;
+  --tp-base-foreground: rgb(255, 255, 255);
+  --tp-base-background: rgb(245, 247, 251);
+  --tp-base-muted: rbg(226, 232, 240);
+  --tp-base-soft: rbg(156, 163, 175);
+  --tp-base-lighter: rbg(55, 65, 81);
+  --tp-base-border: rbg(203, 213, 225);
+  --tp-base-content: rbg(0, 0, 0);
 
-  --color-map-georeference: 239, 68, 68;
-  --color-map-aggregate: 3, 115, 22;
-  --color-map-asserted: 249, 115, 22;
-  --color-map-type-material: 51, 136, 255;
-  --color-map-collection-object: 239, 68, 68;
+  --tp-map-georeference: rbg(239, 68, 68);
+  --tp-map-aggregate: rbg(3, 115, 22);
+  --tp-map-asserted: rbg(249, 115, 22);
+  --tp-map-type-material: rbg(51, 136, 255);
+  --tp-map-collection-object: rbg(239, 68, 68);
 
-  --color-scrollbar-thumb: 156, 163, 175;
-  --color-scrollbar-track: 229, 231, 235;
+  --tp-scrollbar-thumb: rbg(156, 163, 175);
+  --tp-scrollbar-track: rbg(229, 231, 235);
 
-  --color-map-shape-opacity: 0.5;
-  --color-map-marker-opacity: 0.75;
+  --tp-map-shape-opacity: 0.5;
+  --tp-map-marker-opacity: 0.75;
 }
 
 .dark {
-  --color-primary: 23, 23, 23;
-  --color-primary-content: 255, 255, 255;
+  --tp-primary: rbg(23, 23, 23);
+  --tp-primary-content: rbg(255, 255, 255);
   
-  --color-secondary: 14, 165, 233;
-  --color-secondary-content: 255, 255, 255;
+  --tp-secondary: rbg(14, 165, 233);
+  --tp-secondary-content: rbg(255, 255, 255);
 
-  --color-base-background: 23, 23, 23;
-  --color-base-foreground: 38,38,38;
-  --color-base-muted: 48, 48, 48;
-  --color-base-soft: 200, 200, 200;
-  --color-base-lighter: 220, 220, 220;
-  --color-base-border: 38, 38, 38;
-  --color-base-content: 255, 255, 255;
+  --tp-base-background: rbg(23, 23, 23);
+  --tp-base-foreground: rbg(38,38,38);
+  --tp-base-muted: rbg(48, 48, 48);
+  --tp-base-soft: rbg(200, 200, 200);
+  --tp-base-lighter: rbg(220, 220, 220);
+  --tp-base-border: rbg(38, 38, 38);
+  --tp-base-content: rbg(255, 255, 255);
 
-  --color-scrollbar-thumb: 156, 163, 175;
-  --color-scrollbar-track: 55, 65, 81;
+  --tp-scrollbar-thumb: rbg(156, 163, 175);
+  --tp-scrollbar-track: rbg(55, 65, 81);
 }
