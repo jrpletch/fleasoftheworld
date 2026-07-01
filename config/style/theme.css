@@ -7,40 +7,40 @@
 
   --tp-base-foreground: rgb(255, 255, 255);
   --tp-base-background: rgb(245, 247, 251);
-  --tp-base-muted: rbg(226, 232, 240);
-  --tp-base-soft: rbg(156, 163, 175);
-  --tp-base-lighter: rbg(55, 65, 81);
-  --tp-base-border: rbg(203, 213, 225);
-  --tp-base-content: rbg(0, 0, 0);
+  --tp-base-muted: rgb(226, 232, 240);
+  --tp-base-soft: rgb(156, 163, 175);
+  --tp-base-lighter: rgb(55, 65, 81);
+  --tp-base-border: rgb(203, 213, 225);
+  --tp-base-content: rgb(0, 0, 0);
 
-  --tp-map-georeference: rbg(239, 68, 68);
-  --tp-map-aggregate: rbg(3, 115, 22);
-  --tp-map-asserted: rbg(249, 115, 22);
-  --tp-map-type-material: rbg(51, 136, 255);
-  --tp-map-collection-object: rbg(239, 68, 68);
+  --tp-map-georeference: rgb(239, 68, 68);
+  --tp-map-aggregate: rgb(3, 115, 22);
+  --tp-map-asserted: rgb(249, 115, 22);
+  --tp-map-type-material: rgb(51, 136, 255);
+  --tp-map-collection-object: rgb(239, 68, 68);
 
-  --tp-scrollbar-thumb: rbg(156, 163, 175);
-  --tp-scrollbar-track: rbg(229, 231, 235);
+  --tp-scrollbar-thumb: rgb(156, 163, 175);
+  --tp-scrollbar-track: rgb(229, 231, 235);
 
   --tp-map-shape-opacity: 0.5;
   --tp-map-marker-opacity: 0.75;
 }
 
 .dark {
-  --tp-primary: rbg(23, 23, 23);
-  --tp-primary-content: rbg(255, 255, 255);
+  --tp-primary: rgb(23, 23, 23);
+  --tp-primary-content: rgb(255, 255, 255);
   
-  --tp-secondary: rbg(14, 165, 233);
-  --tp-secondary-content: rbg(255, 255, 255);
+  --tp-secondary: rgb(14, 165, 233);
+  --tp-secondary-content: rgb(255, 255, 255);
 
-  --tp-base-background: rbg(23, 23, 23);
-  --tp-base-foreground: rbg(38,38,38);
-  --tp-base-muted: rbg(48, 48, 48);
-  --tp-base-soft: rbg(200, 200, 200);
-  --tp-base-lighter: rbg(220, 220, 220);
-  --tp-base-border: rbg(38, 38, 38);
-  --tp-base-content: rbg(255, 255, 255);
+  --tp-base-background: rgb(23, 23, 23);
+  --tp-base-foreground: rgb(38,38,38);
+  --tp-base-muted: rgb(48, 48, 48);
+  --tp-base-soft: rgb(200, 200, 200);
+  --tp-base-lighter: rgb(220, 220, 220);
+  --tp-base-border: rgb(38, 38, 38);
+  --tp-base-content: rgb(255, 255, 255);
 
-  --tp-scrollbar-thumb: rbg(156, 163, 175);
-  --tp-scrollbar-track: rbg(55, 65, 81);
+  --tp-scrollbar-thumb: rgb(156, 163, 175);
+  --tp-scrollbar-track: rgb(55, 65, 81);
 }
