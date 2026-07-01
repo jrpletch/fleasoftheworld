@@ -24,5 +24,5 @@
 </template>
 
 <script setup>
-import PanelDescendants from '../src/modules/otus/components/Panel/PanelDescendants/PanelDescendants.vue';
+import PanelDescendants from '@/modules/otus/components/Panel/PanelDescendants/PanelDescendants.vue';
 </script>
