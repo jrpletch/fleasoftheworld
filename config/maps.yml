@@ -1,5 +1,5 @@
 map_tiles:
-    - label: OpenStreetMap
+  - label: OpenStreetMap
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
     server: https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png
   - label: GBIF
