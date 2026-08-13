@@ -7,19 +7,20 @@ taxa_page:
           - panel:nomenclature
           - panel:nomenclature-references
 
-        - - panel:map
+        - - panel:map-v2
           - panel:descendants
           - panel:content
           - panel:keys
           - panel:etymology
           - panel:gbif
           - panel:statistics
-
-  asserted_distributions:
-    panels:
-     - - - panel:map
-     - - - panel:asserted-distributions
      
+  asserted_distributions:
+    label: 'Asserted Distributions'
+    rank_group: ['SpeciesGroup']
+    panels:
+      - - - id: panel:asserted_distributions
+  
   specimen_records:
     rank_group: ['SpeciesGroup']
     panels:
