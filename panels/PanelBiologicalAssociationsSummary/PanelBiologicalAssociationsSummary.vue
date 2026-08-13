@@ -14,7 +14,6 @@
     <VCardContent class="min-h-[6rem] overflow-x-auto">
       <!-- Controls -->
       <div class="flex flex-wrap gap-6 items-center mb-4">
-
         <!-- Object / Subject switch -->
         <div class="flex items-center gap-2">
           <span class="font-medium">
@@ -64,17 +63,9 @@
             v-model="selectedRank"
             class="border rounded px-2 py-1 bg-base-background"
           >
-            <option value="species">
-              Species
-            </option>
-
-            <option value="genus">
-              Genus
-            </option>
-
-            <option value="family">
-              Family
-            </option>
+            <option value="species">Species</option>
+            <option value="genus">Genus</option>
+            <option value="family">Family</option>
           </select>
         </div>
       </div>
@@ -95,7 +86,6 @@
         <VTable>
           <VTableHeader class="normal-case">
             <VTableHeaderRow>
-
               <VTableHeaderCell>
                 {{ rankLabel }}
               </VTableHeaderCell>
@@ -113,7 +103,6 @@
               >
                 Total
               </VTableHeaderCell>
-
             </VTableHeaderRow>
           </VTableHeader>
 
@@ -122,16 +111,11 @@
               v-for="row in summaryRows"
               :key="row.key"
             >
-
               <!-- Taxon / endpoint -->
               <VTableBodyCell>
-
                 <!-- Species OTU -->
                 <RouterLink
-                  v-if="
-                    row.otuId &&
-                    row.endpointType === 'Otu'
-                  "
+                  v-if="row.otuId && row.endpointType === 'Otu'"
                   :to="{
                     name: 'otus-id',
                     params: {
@@ -146,7 +130,6 @@
                   v-else
                   v-html="row.label"
                 />
-
               </VTableBodyCell>
 
               <!-- Relationship counts -->
@@ -164,7 +147,6 @@
               >
                 {{ row.total }}
               </VTableBodyCell>
-
             </VTableBodyRow>
           </VTableBody>
         </VTable>
@@ -177,25 +159,14 @@
       >
         No biological association records found.
       </div>
-
     </VCardContent>
   </VCard>
 </template>
 
-
 <script setup>
-import {
-  computed,
-  onMounted,
-  ref
-} from 'vue'
-
+import { computed, onMounted, ref } from 'vue'
 import { makeAPIRequest } from '@/utils'
-
-import {
-  makeBiologicalAssociation
-} from '../PanelBiologicalAssociations/utils/makeBiologicalAssociation.js'
-
+import { makeBiologicalAssociation } from '../PanelBiologicalAssociations/utils/makeBiologicalAssociation.js'
 
 const props = defineProps({
   otuId: {
@@ -204,85 +175,29 @@ const props = defineProps({
   }
 })
 
-
-/*
- * Direction of the relationship.
- *
- * Object:
- *
- *   Current OTU
- *       |
- *       | relationship
- *       v
- *   Object
- *
- * Subject:
- *
- *   Subject
- *       |
- *       | relationship
- *       v
- *   Current OTU
- */
 const selectedDirection = ref('object')
-
-
-/*
- * Taxonomic level used for grouping.
- */
 const selectedRank = ref('species')
-
-
-/*
- * Biological associations returned by TaxonWorks.
- *
- * IMPORTANT:
- *
- * We DO NOT perform a second ID-based filter here.
- *
- * TaxonWorks':
- *
- *   otu_query[otu_id][] = props.otuId
- *
- * is responsible for finding associations involving
- * the current OTU.
- *
- * This is important because an endpoint can be a
- * CollectionObject rather than the OTU itself.
- */
 const biologicalAssociations = ref([])
-
-
 const isLoading = ref(false)
-
-
-/*
- * Number of associations returned by the
- * current-OTU query.
- */
 const totalAssociations = ref(0)
-
-
-/*
- * API page size.
- */
 const perPage = 50
-
 
 /*
  * Fields for the endpoint being displayed.
+ * ADDED: otuId fields to extract associated OTUs from collection objects.
  */
 const sideFields = {
   object: {
     id: 'objectId',
+    otuId: 'objectOtuId',
     type: 'objectType',
     species: 'objectLabel',
     genus: 'objectGenus',
     family: 'objectFamily'
   },
-
   subject: {
     id: 'subjectId',
+    otuId: 'subjectOtuId',
     type: 'subjectType',
     species: 'subjectLabel',
     genus: 'subjectGenus',
@@ -290,346 +205,160 @@ const sideFields = {
   }
 }
 
-
-/*
- * Label for the first table column.
- */
 const rankLabel = computed(() => {
   switch (selectedRank.value) {
     case 'family':
       return 'Family'
-
     case 'genus':
       return 'Genus'
-
     case 'species':
     default:
       return 'Species'
   }
 })
 
-
-/*
- * Fields for the endpoint currently being displayed.
- */
 const currentSideFields = computed(() => {
-  return sideFields[
-    selectedDirection.value
-  ]
+  return sideFields[selectedDirection.value]
 })
 
-
 /*
- * Determine which associations belong to the
- * selected direction.
- *
- * IMPORTANT:
- *
- * This is NOT checking whether the endpoint ID
- * equals props.otuId.
- *
- * Instead, we use the type of the endpoint and
- * the relationship returned by TaxonWorks.
- *
- * For a normal OTU-to-OTU association:
- *
- * Object mode:
- *   current OTU is subject
- *
- * Subject mode:
- *   current OTU is object
- *
- * CollectionObjects are allowed through because
- * the otu_query has already established their
- * connection to the current OTU.
+ * Determine which associations belong to the selected direction.
+ * UPDATED: Uses the extracted OtuId to cleanly filter collection objects.
  */
 const directedAssociations = computed(() => {
   const currentOtuId = Number(props.otuId)
 
-  return biologicalAssociations.value.filter(
-    association => {
+  return biologicalAssociations.value.filter(association => {
+    if (selectedDirection.value === 'object') {
+      const subjectId = Number(association.subjectId)
+      // Check for camelCased property from makeBiologicalAssociation or raw snake_case fallback
+      const subjectOtuId = Number(association.subjectOtuId || association.subject_otu_id)
 
-      /*
-       * If the selected endpoint itself is the
-       * current OTU, use the direct ID relationship.
-       */
-      if (
-        selectedDirection.value === 'object'
-      ) {
-
-        if (
-          Number(association.subjectId) ===
-          currentOtuId
-        ) {
-          return true
-        }
-
-        /*
-         * A CollectionObject can be associated
-         * with the current OTU through its
-         * identification. Do not discard it here.
-         */
-        if (
-          association.subjectType ===
-          'CollectionObject'
-        ) {
-          return true
-        }
-
-        return false
-      }
-
-
-      /*
-       * Subject direction.
-       */
-      if (
-        Number(association.objectId) ===
-        currentOtuId
-      ) {
+      if (subjectId === currentOtuId || subjectOtuId === currentOtuId) {
         return true
       }
-
-
-      /*
-       * Preserve CollectionObject records.
-       *
-       * TaxonWorks has already scoped these records
-       * using otu_query[otu_id][].
-       */
-      if (
-        association.objectType ===
-        'CollectionObject'
-      ) {
+      
+      // Allow purely unidentified collection objects through if necessary
+      if (association.subjectType === 'CollectionObject' && !subjectOtuId) {
         return true
       }
-
-
       return false
     }
-  )
+
+    // Subject direction
+    const objectId = Number(association.objectId)
+    const objectOtuId = Number(association.objectOtuId || association.object_otu_id)
+
+    if (objectId === currentOtuId || objectOtuId === currentOtuId) {
+      return true
+    }
+    
+    if (association.objectType === 'CollectionObject' && !objectOtuId) {
+      return true
+    }
+
+    return false
+  })
 })
 
-
-/*
- * Biological relationship types that occur in
- * the selected direction.
- */
 const relationships = computed(() => {
   return [
     ...new Set(
       directedAssociations.value
-        .map(
-          association =>
-            association.biologicalRelationship
-        )
+        .map(association => association.biologicalRelationship)
         .filter(Boolean)
     )
-  ].sort((a, b) =>
-    a.localeCompare(b)
-  )
+  ].sort((a, b) => a.localeCompare(b))
 })
-
 
 /*
  * Build the summary table.
+ * UPDATED: Aggregates CollectionObjects by their effective OTU ID.
  */
 const summaryRows = computed(() => {
   const groups = new Map()
+  const fields = currentSideFields.value
 
-  const fields =
-    currentSideFields.value
+  for (const association of directedAssociations.value) {
+    const endpointId = association[fields.id]
+    const endpointType = association[fields.type]
+    
+    // Safely extract the OTU ID linked to this endpoint (crucial for CollectionObjects)
+    const endpointOtuId = association[fields.otuId] || association[`${selectedDirection.value}_otu_id`]
 
-
-  for (
-    const association
-    of directedAssociations.value
-  ) {
-
-    /*
-     * Get the endpoint information.
-     */
-    const endpointId =
-      association[fields.id]
-
-    const endpointType =
-      association[fields.type]
-
-    const label =
-      association[
-        fields[selectedRank.value]
-      ]
-
-
-    /*
-     * If we have taxonomic information for this
-     * endpoint, use it.
-     *
-     * For a normal OTU:
-     *
-     * species -> species label
-     * genus   -> genus
-     * family  -> family
-     *
-     * For a CollectionObject, these fields may
-     * not exist. In that case we fall back to
-     * the endpoint label.
-     */
+    let label = association[fields[selectedRank.value]]
     let displayLabel = label
 
-
     if (!displayLabel) {
-      displayLabel =
-        association[
-          selectedDirection.value === 'object'
-            ? 'objectLabel'
-            : 'subjectLabel'
-        ]
+      displayLabel = association[selectedDirection.value === 'object' ? 'objectLabel' : 'subjectLabel']
     }
 
+    if (!displayLabel) continue
 
-    /*
-     * Do not discard CollectionObjects simply
-     * because they lack genus/family information.
-     */
-    if (!displayLabel) {
-      continue
-    }
+    // Determine the true OTU ID for grouping purposes
+    const effectiveOtuId = endpointType === 'Otu' ? endpointId : (endpointOtuId || null)
 
-
-    /*
-     * Determine how the record should be grouped.
-     *
-     * Normal OTUs:
-     *
-     *   Species = OTU ID + label
-     *   Genus   = genus name
-     *   Family  = family name
-     *
-     * CollectionObjects:
-     *
-     *   They are grouped by their endpoint label
-     *   rather than being treated as an OTU.
-     */
     let key
-
-    if (
-      endpointType === 'CollectionObject'
-    ) {
-
-      key =
-        `collection-object:${endpointId || displayLabel}`
-
-    } else if (
-      selectedRank.value === 'species'
-    ) {
-
-      key =
-        `${endpointId || ''}:${displayLabel}`
-
+    if (effectiveOtuId && selectedRank.value === 'species') {
+      // Group by OTU ID, meaning CollectionObjects and Otus of the same species combine
+      key = `otu:${effectiveOtuId}`
+    } else if (endpointType === 'CollectionObject') {
+      key = `collection-object:${endpointId || displayLabel}`
+    } else if (selectedRank.value === 'species') {
+      key = `${endpointId || ''}:${displayLabel}`
     } else {
-
       key = displayLabel
     }
 
-
-    /*
-     * Create row.
-     */
     if (!groups.has(key)) {
-
       groups.set(key, {
         key,
-
         label: displayLabel,
-
-        /*
-         * Only actual OTUs get a TaxonPages link.
-         */
-        otuId:
-          endpointType === 'Otu'
-            ? endpointId
-            : null,
-
-        endpointType,
-
+        otuId: effectiveOtuId,
+        endpointType, 
         counts: {},
-
         total: 0
       })
     }
 
-
     const row = groups.get(key)
 
-
-    /*
-     * Biological relationship.
-     */
-    const relationship =
-      association.biologicalRelationship
-
-
-    if (!relationship) {
-      continue
+    // Upgrade the group's label if an actual Otu is encountered. 
+    // This replaces a generic "CollectionObject..." label with the actual species name!
+    if (endpointType === 'Otu' && row.endpointType !== 'Otu') {
+      row.label = displayLabel
+      row.endpointType = 'Otu'
+    } else if (row.endpointType !== 'Otu' && displayLabel.startsWith('CollectionObject')) {
+      // Fallback: If no Otu record exists in this group, try to use genus text
+      const genusText = association[fields.genus]
+      if (genusText) {
+        row.label = `${genusText} sp.`
+      }
     }
 
+    const relationship = association.biologicalRelationship
+    if (!relationship) continue
 
-    /*
-     * Initialize relationship count.
-     */
-    if (
-      !row.counts[relationship]
-    ) {
+    if (!row.counts[relationship]) {
       row.counts[relationship] = 0
     }
 
-
-    /*
-     * Increment relationship count.
-     */
     row.counts[relationship] += 1
-
-
-    /*
-     * Increment total.
-     */
     row.total += 1
   }
 
-
-  /*
-   * Sort by number of records.
-   */
-  return [...groups.values()].sort(
-    (a, b) => {
-
-      if (b.total !== a.total) {
-        return b.total - a.total
-      }
-
-      return a.label.localeCompare(
-        b.label
-      )
-    }
-  )
+  return [...groups.values()].sort((a, b) => {
+    if (b.total !== a.total) return b.total - a.total
+    return a.label.localeCompare(b.label)
+  })
 })
 
-
-/*
- * Load ALL biological associations involving
- * the current OTU.
- */
 async function loadBiologicalAssociations() {
   isLoading.value = true
-
   biologicalAssociations.value = []
-
   totalAssociations.value = 0
 
-
   try {
-
     const extend = [
       'object',
       'subject',
@@ -638,167 +367,53 @@ async function loadBiologicalAssociations() {
       'biological_relationship_types'
     ]
 
-
-    /*
-     * First API request.
-     *
-     * This is the important scoping operation.
-     *
-     * TaxonWorks determines which associations
-     * involve the current OTU.
-     */
-    const firstResponse =
-      await makeAPIRequest.get(
-        '/biological_associations/basic',
-        {
-          params: {
-            'otu_query[coordinatify]':
-              true,
-
-            'otu_query[otu_id][]':
-              props.otuId,
-
-            per: perPage,
-
-            page: 1,
-
-            extend
-          }
+    const firstResponse = await makeAPIRequest.get(
+      '/biological_associations/basic',
+      {
+        params: {
+          'otu_query[coordinatify]': true,
+          'otu_query[otu_id][]': props.otuId,
+          per: perPage,
+          page: 1,
+          extend
         }
-      )
-
-
-    /*
-     * Convert API records into the normalized
-     * biological-association structure.
-     */
-    const firstItems =
-      firstResponse.data.map(
-        makeBiologicalAssociation
-      )
-
-
-    /*
-     * Pagination total from TaxonWorks.
-     */
-    const total = Number(
-      firstResponse.headers[
-        'pagination-total'
-      ] ||
-      firstItems.length
+      }
     )
 
-
-    /*
-     * Start with page 1.
-     */
-    const allItems = [
-      ...firstItems
-    ]
-
-
-    /*
-     * Fetch all remaining pages.
-     *
-     * IMPORTANT:
-     *
-     * Every page retains the same:
-     *
-     *   otu_query[otu_id][]
-     *
-     * parameter.
-     */
-    const totalPages =
-      Math.ceil(
-        total / perPage
-      )
-
+    const firstItems = firstResponse.data.map(makeBiologicalAssociation)
+    const total = Number(firstResponse.headers['pagination-total'] || firstItems.length)
+    const allItems = [...firstItems]
+    const totalPages = Math.ceil(total / perPage)
 
     if (totalPages > 1) {
-
-      for (
-        let page = 2;
-        page <= totalPages;
-        page++
-      ) {
-
-        const response =
-          await makeAPIRequest.get(
-            '/biological_associations/basic',
-            {
-              params: {
-                'otu_query[coordinatify]':
-                  true,
-
-                'otu_query[otu_id][]':
-                  props.otuId,
-
-                per: perPage,
-
-                page,
-
-                extend
-              }
+      for (let page = 2; page <= totalPages; page++) {
+        const response = await makeAPIRequest.get(
+          '/biological_associations/basic',
+          {
+            params: {
+              'otu_query[coordinatify]': true,
+              'otu_query[otu_id][]': props.otuId,
+              per: perPage,
+              page,
+              extend
             }
-          )
-
-
-        allItems.push(
-          ...response.data.map(
-            makeBiologicalAssociation
-          )
+          }
         )
+        allItems.push(...response.data.map(makeBiologicalAssociation))
       }
     }
 
-
-    /*
-     * IMPORTANT:
-     *
-     * Do NOT filter allItems using:
-     *
-     *   subjectId === props.otuId
-     *
-     * or:
-     *
-     *   objectId === props.otuId
-     *
-     * because CollectionObjects can be the actual
-     * association endpoint while their identification
-     * is what connects them to the current OTU.
-     */
-    biologicalAssociations.value =
-      allItems
-
-
-    /*
-     * This is the number of associations returned
-     * by the current-OTU query.
-     */
-    totalAssociations.value =
-      allItems.length
-
+    biologicalAssociations.value = allItems
+    totalAssociations.value = allItems.length
   } catch (error) {
-
-    console.error(
-      'Error loading biological associations:',
-      error
-    )
-
+    console.error('Error loading biological associations:', error)
     biologicalAssociations.value = []
-
     totalAssociations.value = 0
-
   } finally {
-
     isLoading.value = false
   }
 }
 
-
-/*
- * Initial load.
- */
 onMounted(() => {
   loadBiologicalAssociations()
 })
