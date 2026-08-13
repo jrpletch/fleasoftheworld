@@ -19,7 +19,7 @@ taxa_page:
     label: 'Asserted Distributions'
     rank_group: ['SpeciesGroup']
     panels:
-      - - - id: panel:asserted_distributions
+      - - - id: panel:asserted-distributions
   
   specimen_records:
     rank_group: ['SpeciesGroup']
