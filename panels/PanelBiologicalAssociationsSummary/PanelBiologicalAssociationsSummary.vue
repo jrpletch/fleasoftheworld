@@ -5,28 +5,85 @@
     </ClientOnly>
 
     <VCardHeader>
-      Biological associations summary
+      Biological Associations
       <span v-if="totalAssociations">
         ({{ totalAssociations }})
       </span>
     </VCardHeader>
 
     <VCardContent class="min-h-[6rem] overflow-x-auto">
-      <div v-if="summaryRows.length" class="w-full">
+      <!-- Controls -->
+      <div class="flex flex-wrap gap-6 items-center mb-4">
+        <!-- Object / Subject switch -->
+        <div class="flex items-center gap-2">
+          <span class="font-medium">
+            Relationship direction:
+          </span>
+
+          <div class="inline-flex border rounded overflow-hidden">
+            <button
+              type="button"
+              @click="selectedDirection = 'object'"
+              class="px-3 py-1 border-r"
+              :class="
+                selectedDirection === 'object'
+                  ? 'bg-gray-300 font-semibold'
+                  : 'bg-base-background hover:bg-gray-100'
+              "
+            >
+              Object
+            </button>
+
+            <button
+              type="button"
+              @click="selectedDirection = 'subject'"
+              class="px-3 py-1"
+              :class="
+                selectedDirection === 'subject'
+                  ? 'bg-gray-300 font-semibold'
+                  : 'bg-base-background hover:bg-gray-100'
+              "
+            >
+              Subject
+            </button>
+          </div>
+        </div>
+
+        <!-- Taxonomic level -->
+        <div class="flex items-center gap-2">
+          <label
+            for="association-rank"
+            class="font-medium"
+          >
+            Taxonomic level:
+          </label>
+
+          <select
+            id="association-rank"
+            v-model="selectedRank"
+            class="border rounded px-2 py-1 bg-base-background"
+          >
+            <option value="species">Species</option>
+            <option value="genus">Genus</option>
+            <option value="family">Family</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Summary table -->
+      <div
+        v-if="summaryRows.length"
+        class="w-full"
+      >
         <VTable>
           <VTableHeader class="normal-case">
             <VTableHeaderRow>
+              <!-- Taxon column -->
               <VTableHeaderCell>
-                <select
-                  v-model="selectedRank"
-                  class="border rounded px-2 py-1 bg-base-background"
-                >
-                  <option value="species">Species</option>
-                  <option value="genus">Genus</option>
-                  <option value="family">Family</option>
-                </select>
+                {{ rankLabel }}
               </VTableHeaderCell>
 
+              <!-- Biological relationship columns -->
               <VTableHeaderCell
                 v-for="relationship in relationships"
                 :key="relationship"
@@ -35,7 +92,10 @@
                 {{ relationship }}
               </VTableHeaderCell>
 
-              <VTableHeaderCell class="text-center border-l-2">
+              <!-- Total -->
+              <VTableHeaderCell
+                class="text-center border-l-2"
+              >
                 Total
               </VTableHeaderCell>
             </VTableHeaderRow>
@@ -46,22 +106,29 @@
               v-for="row in summaryRows"
               :key="row.key"
             >
+              <!-- Taxon -->
               <VTableBodyCell>
-                <template v-if="selectedRank === 'species' && row.otuId">
-                  <RouterLink
-                    :to="{
-                      name: 'otus-id',
-                      params: { id: row.otuId }
-                    }"
-                    v-html="row.label"
-                  />
-                </template>
+                <RouterLink
+                  v-if="
+                    selectedRank === 'species' &&
+                    row.otuId
+                  "
+                  :to="{
+                    name: 'otus-id',
+                    params: {
+                      id: row.otuId
+                    }
+                  }"
+                  v-html="row.label"
+                />
 
-                <template v-else>
-                  <span v-html="row.label" />
-                </template>
+                <span
+                  v-else
+                  v-html="row.label"
+                />
               </VTableBodyCell>
 
+              <!-- Relationship counts -->
               <VTableBodyCell
                 v-for="relationship in relationships"
                 :key="relationship"
@@ -70,6 +137,7 @@
                 {{ row.counts[relationship] || 0 }}
               </VTableBodyCell>
 
+              <!-- Total -->
               <VTableBodyCell
                 class="text-center font-semibold border-l-2"
               >
@@ -80,8 +148,12 @@
         </VTable>
       </div>
 
+      <!-- No results -->
       <div
-        v-if="!isLoading && !summaryRows.length"
+        v-if="
+          !isLoading &&
+          !summaryRows.length
+        "
         class="text-xl text-center my-8 w-full"
       >
         No biological association records found.
@@ -91,8 +163,15 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import {
+  computed,
+  onMounted,
+  ref,
+  watch
+} from 'vue'
+
 import { makeAPIRequest } from '@/utils'
+
 import { makeBiologicalAssociation } from '../PanelBiologicalAssociations/utils/makeBiologicalAssociation.js'
 
 const props = defineProps({
@@ -102,214 +181,415 @@ const props = defineProps({
   }
 })
 
-const extend = [
-  'object',
-  'subject',
-  'biological_relationship',
-  'taxonomy',
-  'biological_relationship_types'
-]
+/*
+ * Which side of the biological association should
+ * be displayed?
+ *
+ * Object:
+ *
+ *   Current taxon
+ *        |
+ *        | relationship
+ *        v
+ *   Object taxon
+ *
+ * Subject:
+ *
+ *   Subject taxon
+ *        |
+ *        | relationship
+ *        v
+ *   Current taxon
+ */
+const selectedDirection = ref('object')
 
-const biologicalAssociations = ref([])
-const isLoading = ref(false)
-const totalAssociations = ref(0)
-
+/*
+ * Taxonomic level used to group the associated taxa.
+ */
 const selectedRank = ref('species')
 
 /*
- * The API is paginated. We use a reasonably large page size and
- * retrieve every page before generating the summary.
+ * All biological association records returned
+ * from the API.
+ */
+const biologicalAssociations = ref([])
+
+/*
+ * Loading state.
+ */
+const isLoading = ref(false)
+
+/*
+ * Total number of biological association records.
+ */
+const totalAssociations = ref(0)
+
+/*
+ * Number of records requested per API page.
  */
 const perPage = 100
 
 /*
- * Get the unique biological relationships represented by the
- * associations for this taxon.
- *
- * Sorting alphabetically makes the columns predictable.
+ * Fields used for each side of a biological
+ * association.
  */
-const relationships = computed(() => {
-  return [...new Set(
-    biologicalAssociations.value
-      .map((association) => association.biologicalRelationship)
-      .filter(Boolean)
-  )].sort((a, b) => a.localeCompare(b))
-})
+const sideFields = {
+  object: {
+    id: 'objectId',
+    species: 'objectLabel',
+    genus: 'objectGenus',
+    family: 'objectFamily'
+  },
 
-/*
- * Return the taxonomic name to use for an association based
- * on the currently selected rank.
- */
-function getRankValue(association) {
-  switch (selectedRank.value) {
-    case 'family':
-      return association.objectFamily
-
-    case 'genus':
-      return association.objectGenus
-
-    case 'species':
-    default:
-      return association.objectLabel
+  subject: {
+    id: 'subjectId',
+    species: 'subjectLabel',
+    genus: 'subjectGenus',
+    family: 'subjectFamily'
   }
 }
 
 /*
- * Build the summary table.
+ * Label used for the first table column.
+ */
+const rankLabel = computed(() => {
+  switch (selectedRank.value) {
+    case 'family':
+      return 'Family'
+
+    case 'genus':
+      return 'Genus'
+
+    case 'species':
+    default:
+      return 'Species'
+  }
+})
+
+/*
+ * Fields corresponding to the side selected
+ * by the user.
+ */
+const currentSideFields = computed(() => {
+  return sideFields[selectedDirection.value]
+})
+
+/*
+ * Find every unique biological relationship
+ * represented in the records.
  *
- * Each row represents one host taxon.
+ * These become the table columns.
  *
- * Example:
+ * For example:
  *
- * {
- *   key: 'Oryctolagus cuniculus',
- *   label: 'Oryctolagus cuniculus',
- *   otuId: 1234,
- *   counts: {
- *     'collected from': 12,
- *     'collected from nest': 4
- *   },
- *   total: 16
- * }
+ * collected from
+ * collected from nest
+ * parasitizes
+ * infects
+ */
+const relationships = computed(() => {
+  return [
+    ...new Set(
+      biologicalAssociations.value
+        .map(
+          (association) =>
+            association.biologicalRelationship
+        )
+        .filter(Boolean)
+    )
+  ].sort((a, b) =>
+    a.localeCompare(b)
+  )
+})
+
+/*
+ * Build the summarized rows.
  */
 const summaryRows = computed(() => {
   const groups = new Map()
 
-  for (const association of biologicalAssociations.value) {
-    const label = getRankValue(association)
+  const fields =
+    currentSideFields.value
 
+  for (
+    const association
+    of biologicalAssociations.value
+  ) {
+    /*
+     * Determine which taxonomic name to use.
+     *
+     * Examples:
+     *
+     * Object + Species
+     *   -> objectLabel
+     *
+     * Object + Genus
+     *   -> objectGenus
+     *
+     * Subject + Species
+     *   -> subjectLabel
+     */
+    const label =
+      association[
+        fields[selectedRank.value]
+      ]
+
+    /*
+     * Ignore associations where the selected
+     * taxonomic information isn't available.
+     */
     if (!label) {
       continue
     }
 
     /*
-     * For species we use the OTU ID when available.
-     * For genus/family, the taxon name is sufficient for grouping.
+     * Species are grouped by OTU ID and name.
+     *
+     * This prevents two different OTUs with the
+     * same label from accidentally being combined.
+     *
+     * Genus and family are grouped by their name.
      */
     const key =
       selectedRank.value === 'species'
-        ? `${association.objectId || ''}:${label}`
+        ? `${association[fields.id] || ''}:${label}`
         : label
 
+    /*
+     * Create the row the first time we encounter
+     * this taxon.
+     */
     if (!groups.has(key)) {
       groups.set(key, {
         key,
         label,
+
+        /*
+         * Store the OTU ID so that species names
+         * can link to their TaxonPages page.
+         */
         otuId:
           selectedRank.value === 'species'
-            ? association.objectId
+            ? association[fields.id]
             : null,
+
+        /*
+         * Counts for each relationship.
+         *
+         * Example:
+         *
+         * {
+         *   'collected from': 12,
+         *   'collected from nest': 4
+         * }
+         */
         counts: {},
+
+        /*
+         * Total number of associations for this
+         * taxon.
+         */
         total: 0
       })
     }
 
     const row = groups.get(key)
-    const relationship = association.biologicalRelationship
+
+    /*
+     * Get the biological relationship.
+     */
+    const relationship =
+      association.biologicalRelationship
 
     if (!relationship) {
       continue
     }
 
-    if (!row.counts[relationship]) {
+    /*
+     * Initialize this relationship's count.
+     */
+    if (
+      !row.counts[relationship]
+    ) {
       row.counts[relationship] = 0
     }
 
+    /*
+     * Increment relationship count.
+     */
     row.counts[relationship] += 1
+
+    /*
+     * Increment total.
+     */
     row.total += 1
   }
 
   /*
-   * Most records first.
+   * Sort by total number of records.
    *
-   * If two taxa have the same number of records,
-   * sort them alphabetically as a secondary sort.
+   * Highest total first.
+   *
+   * Alphabetical name is used as the secondary
+   * sort when totals are equal.
    */
-  return [...groups.values()].sort((a, b) => {
-    if (b.total !== a.total) {
-      return b.total - a.total
+  return [...groups.values()].sort(
+    (a, b) => {
+      if (b.total !== a.total) {
+        return b.total - a.total
+      }
+
+      return a.label.localeCompare(
+        b.label
+      )
     }
-
-    return a.label.localeCompare(b.label)
-  })
+  )
 })
 
-onMounted(() => {
-  loadAllBiologicalAssociations()
-})
-
+/*
+ * Load all biological associations for the
+ * currently selected direction.
+ */
 async function loadAllBiologicalAssociations() {
   isLoading.value = true
+
   biologicalAssociations.value = []
+  totalAssociations.value = 0
 
   try {
     /*
-     * First request tells us how many records exist.
+     * Common API parameters.
      */
-    const firstResponse = await makeAPIRequest.get(
-      '/biological_associations/basic',
-      {
-        params: {
-          'otu_query[coordinatify]': true,
-          'otu_query[otu_id][]': props.otuId,
-          per: perPage,
-          page: 1,
-          extend
+    const params = {
+      per: perPage,
+      page: 1,
+
+      extend: [
+        'object',
+        'subject',
+        'biological_relationship',
+        'taxonomy',
+        'biological_relationship_types'
+      ]
+    }
+
+    /*
+     * IMPORTANT:
+     *
+     * If the user wants to see OBJECTS,
+     * the current taxon must be the SUBJECT.
+     *
+     * If the user wants to see SUBJECTS,
+     * the current taxon must be the OBJECT.
+     */
+
+    if (
+      selectedDirection.value ===
+      'object'
+    ) {
+      params[
+        'subject_otu_query[otu_id][]'
+      ] = props.otuId
+    } else {
+      params[
+        'object_otu_query[otu_id][]'
+      ] = props.otuId
+    }
+
+    /*
+     * Get the first page.
+     */
+    const firstResponse =
+      await makeAPIRequest.get(
+        '/biological_associations/basic',
+        {
+          params
         }
-      }
-    )
+      )
 
-    const firstItems = firstResponse.data.map(
-      makeBiologicalAssociation
-    )
-
-    const total = Number(
-      firstResponse.headers['pagination-total'] ||
-      firstItems.length
-    )
-
-    totalAssociations.value = total
+    const firstItems =
+      firstResponse.data.map(
+        makeBiologicalAssociation
+      )
 
     /*
-     * Determine how many pages are required.
+     * Determine the total number of
+     * association records.
      */
-    const totalPages = Math.ceil(total / perPage)
+    const total = Number(
+      firstResponse.headers[
+        'pagination-total'
+      ] ||
+        firstItems.length
+    )
 
-    const allItems = [...firstItems]
+    totalAssociations.value =
+      total
 
     /*
-     * Fetch remaining pages.
+     * Determine how many pages we need.
+     */
+    const totalPages =
+      Math.ceil(
+        total / perPage
+      )
+
+    /*
+     * Start with the first page.
+     */
+    const allItems = [
+      ...firstItems
+    ]
+
+    /*
+     * Fetch all remaining pages.
      */
     if (totalPages > 1) {
       const requests = []
 
-      for (let page = 2; page <= totalPages; page++) {
+      for (
+        let page = 2;
+        page <= totalPages;
+        page++
+      ) {
         requests.push(
           makeAPIRequest.get(
             '/biological_associations/basic',
             {
               params: {
-                'otu_query[coordinatify]': true,
-                'otu_query[otu_id][]': props.otuId,
-                per: perPage,
-                page,
-                extend
+                ...params,
+                page
               }
             }
           )
         )
       }
 
-      const responses = await Promise.all(requests)
+      const responses =
+        await Promise.all(
+          requests
+        )
 
-      for (const response of responses) {
+      for (
+        const response
+        of responses
+      ) {
         allItems.push(
-          ...response.data.map(makeBiologicalAssociation)
+          ...response.data.map(
+            makeBiologicalAssociation
+          )
         )
       }
     }
 
-    biologicalAssociations.value = allItems
+    /*
+     * Store all records.
+     *
+     * summaryRows will automatically
+     * recompute.
+     */
+    biologicalAssociations.value =
+      allItems
   } catch (error) {
     console.error(
       'Error loading biological association summary:',
@@ -322,4 +602,24 @@ async function loadAllBiologicalAssociations() {
     isLoading.value = false
   }
 }
+
+/*
+ * When the user switches between Object
+ * and Subject, we need to make a new API
+ * request because we're asking TaxonWorks
+ * for associations on the opposite side.
+ */
+watch(
+  selectedDirection,
+  () => {
+    loadAllBiologicalAssociations()
+  }
+)
+
+/*
+ * Initial load.
+ */
+onMounted(() => {
+  loadAllBiologicalAssociations()
+})
 </script>
