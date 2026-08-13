@@ -28,7 +28,8 @@ taxa_page:
   
   biological_associations:
     panels:
-      - - - panel:biological-associations
+      - - - panel:biological-associations-summary
+          - panel:biological-associations
       
   bibliography:
     panels:
