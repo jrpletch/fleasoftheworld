@@ -406,6 +406,7 @@ async function fetchCitations(distributionIds) {
   const params = new URLSearchParams()
   params.append('citation_object_type', 'AssertedDistribution')
   params.append('extend[]', 'source')
+  params.append('per', '1000')
   distributionIds.forEach((id) => params.append('citation_object_id[]', id))
 
   const { data: citations } = await makeAPIRequest.get(`/citations?${params.toString()}`)
