@@ -182,10 +182,9 @@ const isLoading = ref(false)
 const totalAssociations = ref(0)
 const perPage = 50
 
-/*
- * Fields for the endpoint being displayed.
- * ADDED: otuId fields to extract associated OTUs from collection objects.
- */
+// New ref to dynamically store missing OTU names fetched from the API
+const fetchedOtuLabels = ref({})
+
 const sideFields = {
   object: {
     id: 'objectId',
@@ -221,33 +220,26 @@ const currentSideFields = computed(() => {
   return sideFields[selectedDirection.value]
 })
 
-/*
- * Determine which associations belong to the selected direction.
- * UPDATED: Uses the extracted OtuId to cleanly filter collection objects.
- */
 const directedAssociations = computed(() => {
   const currentOtuId = Number(props.otuId)
 
   return biologicalAssociations.value.filter(association => {
     if (selectedDirection.value === 'object') {
       const subjectId = Number(association.subjectId)
-      // Check for camelCased property from makeBiologicalAssociation or raw snake_case fallback
-      const subjectOtuId = Number(association.subjectOtuId || association.subject_otu_id)
+      const subjectOtuId = Number(association.subjectOtuId)
 
       if (subjectId === currentOtuId || subjectOtuId === currentOtuId) {
         return true
       }
       
-      // Allow purely unidentified collection objects through if necessary
       if (association.subjectType === 'CollectionObject' && !subjectOtuId) {
         return true
       }
       return false
     }
 
-    // Subject direction
     const objectId = Number(association.objectId)
-    const objectOtuId = Number(association.objectOtuId || association.object_otu_id)
+    const objectOtuId = Number(association.objectOtuId)
 
     if (objectId === currentOtuId || objectOtuId === currentOtuId) {
       return true
@@ -271,10 +263,6 @@ const relationships = computed(() => {
   ].sort((a, b) => a.localeCompare(b))
 })
 
-/*
- * Build the summary table.
- * UPDATED: Aggregates CollectionObjects by their effective OTU ID.
- */
 const summaryRows = computed(() => {
   const groups = new Map()
   const fields = currentSideFields.value
@@ -282,30 +270,32 @@ const summaryRows = computed(() => {
   for (const association of directedAssociations.value) {
     const endpointId = association[fields.id]
     const endpointType = association[fields.type]
-    
-    // Safely extract the OTU ID linked to this endpoint (crucial for CollectionObjects)
-    const endpointOtuId = association[fields.otuId] || association[`${selectedDirection.value}_otu_id`]
+    const endpointOtuId = association[fields.otuId]
 
-    let label = association[fields[selectedRank.value]]
-    let displayLabel = label
+    let displayLabel
 
-    if (!displayLabel) {
-      displayLabel = association[selectedDirection.value === 'object' ? 'objectLabel' : 'subjectLabel']
+    if (selectedRank.value === 'species') {
+      // Prioritize the deep-extracted name (which includes subspecies)
+      displayLabel = association[selectedDirection.value === 'object' ? 'objectExtractedName' : 'subjectExtractedName']
+                  || association[fields.species]
+                  || association[selectedDirection.value === 'object' ? 'objectLabel' : 'subjectLabel']
+    } else {
+      displayLabel = association[fields[selectedRank.value]]
+                  || association[selectedDirection.value === 'object' ? 'objectLabel' : 'subjectLabel']
     }
 
     if (!displayLabel) continue
 
-    // Determine the true OTU ID for grouping purposes
     const effectiveOtuId = endpointType === 'Otu' ? endpointId : (endpointOtuId || null)
-
     let key
-    if (effectiveOtuId && selectedRank.value === 'species') {
-      // Group by OTU ID, meaning CollectionObjects and Otus of the same species combine
-      key = `otu:${effectiveOtuId}`
-    } else if (endpointType === 'CollectionObject') {
-      key = `collection-object:${endpointId || displayLabel}`
-    } else if (selectedRank.value === 'species') {
-      key = `${endpointId || ''}:${displayLabel}`
+
+    if (selectedRank.value === 'species') {
+      if (effectiveOtuId) {
+        key = `otu:${effectiveOtuId}`
+      } else {
+        // Group by the name string if OTU ID is missing so identical subspecies collapse together
+        key = `name:${displayLabel}`
+      }
     } else {
       key = displayLabel
     }
@@ -314,8 +304,8 @@ const summaryRows = computed(() => {
       groups.set(key, {
         key,
         label: displayLabel,
-        otuId: effectiveOtuId,
-        endpointType, 
+        otuId: selectedRank.value === 'species' ? effectiveOtuId : null,
+        endpointType: selectedRank.value === 'species' ? endpointType : null, 
         counts: {},
         total: 0
       })
@@ -323,16 +313,22 @@ const summaryRows = computed(() => {
 
     const row = groups.get(key)
 
-    // Upgrade the group's label if an actual Otu is encountered. 
-    // This replaces a generic "CollectionObject..." label with the actual species name!
-    if (endpointType === 'Otu' && row.endpointType !== 'Otu') {
-      row.label = displayLabel
-      row.endpointType = 'Otu'
-    } else if (row.endpointType !== 'Otu' && displayLabel.startsWith('CollectionObject')) {
-      // Fallback: If no Otu record exists in this group, try to use genus text
-      const genusText = association[fields.genus]
-      if (genusText) {
-        row.label = `${genusText} sp.`
+    if (selectedRank.value === 'species') {
+      if (endpointType === 'Otu' && row.endpointType !== 'Otu') {
+        // Upgrade from explicit OTU record
+        row.label = displayLabel
+        row.endpointType = 'Otu'
+      } else if (row.endpointType !== 'Otu') {
+        // Look up the name dynamically if we fetched it
+        if (effectiveOtuId && fetchedOtuLabels.value[effectiveOtuId]) {
+          row.label = fetchedOtuLabels.value[effectiveOtuId]
+          row.endpointType = 'Otu' 
+        } else if (displayLabel.startsWith('CollectionObject')) {
+          const genusText = association[fields.genus]
+          if (genusText) {
+            row.label = `${genusText} sp.`
+          }
+        }
       }
     }
 
@@ -352,6 +348,76 @@ const summaryRows = computed(() => {
     return a.label.localeCompare(b.label)
   })
 })
+
+// Utility functions to deep-extract subspecies/species names for Collection Objects
+function getTaxonFromTaxonomy(taxonomy) {
+  if (!taxonomy) return null
+  return taxonomy.subspecies || taxonomy.species || taxonomy.genus
+}
+
+function extractTaxonName(endpoint, taxonomyExt) {
+  if (!endpoint) return null
+  if (endpoint.type === 'Otu') return endpoint.object_tag || endpoint.name
+  
+  // Prefer the explicit taxonomy object if provided
+  const taxName = getTaxonFromTaxonomy(taxonomyExt) || getTaxonFromTaxonomy(endpoint.taxonomy)
+  if (taxName) return taxName
+
+  // Fallback: extract the scientific name from TaxonWorks object_tag parenthesis
+  if (endpoint.object_tag && endpoint.object_tag.includes('(')) {
+    const match = endpoint.object_tag.match(/\(([^)]+)\)/)
+    if (match) {
+      return match[1]
+    }
+  }
+  return null
+}
+
+const processItem = (item) => ({
+  ...makeBiologicalAssociation(item),
+  subjectOtuId: item.subject_otu_id || item.subject?.otu_id,
+  objectOtuId: item.object_otu_id || item.object?.otu_id,
+  subjectExtractedName: extractTaxonName(item.subject, item.subject_taxonomy),
+  objectExtractedName: extractTaxonName(item.object, item.object_taxonomy)
+})
+
+async function fetchMissingOtuLabels(allItems) {
+  const explicitOtuIds = new Set()
+  const allOtuIds = new Set()
+
+  for (const item of allItems) {
+    if (item.subjectOtuId) allOtuIds.add(Number(item.subjectOtuId))
+    if (item.objectOtuId) allOtuIds.add(Number(item.objectOtuId))
+
+    if (item.subjectType === 'Otu' && item.subjectId) {
+      explicitOtuIds.add(Number(item.subjectId))
+    }
+    if (item.objectType === 'Otu' && item.objectId) {
+      explicitOtuIds.add(Number(item.objectId))
+    }
+  }
+
+  const idsToFetch = Array.from(allOtuIds).filter(id => !explicitOtuIds.has(id))
+  
+  if (!idsToFetch.length) return
+
+  const chunkSize = 50
+  for (let i = 0; i < idsToFetch.length; i += chunkSize) {
+    const chunk = idsToFetch.slice(i, i + chunkSize)
+    try {
+      const query = chunk.map(id => `id[]=${id}`).join('&')
+      const response = await makeAPIRequest.get(`/otus.json?${query}`)
+      
+      const newLabels = { ...fetchedOtuLabels.value }
+      response.data.forEach(otu => {
+        newLabels[otu.id] = otu.object_tag || otu.name
+      })
+      fetchedOtuLabels.value = newLabels
+    } catch (error) {
+      console.error('Failed to fetch missing OTU labels:', error)
+    }
+  }
+}
 
 async function loadBiologicalAssociations() {
   isLoading.value = true
@@ -380,7 +446,7 @@ async function loadBiologicalAssociations() {
       }
     )
 
-    const firstItems = firstResponse.data.map(makeBiologicalAssociation)
+    const firstItems = firstResponse.data.map(processItem)
     const total = Number(firstResponse.headers['pagination-total'] || firstItems.length)
     const allItems = [...firstItems]
     const totalPages = Math.ceil(total / perPage)
@@ -399,12 +465,14 @@ async function loadBiologicalAssociations() {
             }
           }
         )
-        allItems.push(...response.data.map(makeBiologicalAssociation))
+        allItems.push(...response.data.map(processItem))
       }
     }
 
     biologicalAssociations.value = allItems
     totalAssociations.value = allItems.length
+    fetchMissingOtuLabels(allItems)
+
   } catch (error) {
     console.error('Error loading biological associations:', error)
     biologicalAssociations.value = []
