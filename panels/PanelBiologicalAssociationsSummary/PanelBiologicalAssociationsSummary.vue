@@ -195,7 +195,9 @@ import {
 
 import { makeAPIRequest } from '@/utils'
 
-import { makeBiologicalAssociation } from '../PanelBiologicalAssociations/utils/makeBiologicalAssociation.js'
+import {
+  makeBiologicalAssociation
+} from '../PanelBiologicalAssociations/utils/makeBiologicalAssociation.js'
 
 
 const props = defineProps({
@@ -236,16 +238,18 @@ const selectedRank = ref('species')
 
 
 /*
- * All associations involving the current OTU.
+ * Associations involving the current OTU.
  *
  * IMPORTANT:
  *
- * These are already scoped by the API using:
+ * The API request is scoped using:
  *
  *   otu_query[otu_id][] = props.otuId
  *
- * We then determine whether the current OTU is
- * the subject or object in JavaScript.
+ * We ALSO explicitly filter the returned records
+ * below so that this array can never contain an
+ * association where the current OTU is neither
+ * the subject nor the object.
  */
 const biologicalAssociations = ref([])
 
@@ -253,6 +257,10 @@ const biologicalAssociations = ref([])
 const isLoading = ref(false)
 
 
+/*
+ * Number of association records involving
+ * the current OTU.
+ */
 const totalAssociations = ref(0)
 
 
@@ -305,20 +313,69 @@ const rankLabel = computed(() => {
  * Fields for the side currently being summarized.
  */
 const currentSideFields = computed(() => {
-  return sideFields[
-    selectedDirection.value
-  ]
+  return sideFields[selectedDirection.value]
 })
 
 
 /*
- * Determine which biological relationships
- * occur in the currently selected direction.
+ * Explicitly determine which associations belong
+ * to the selected direction.
+ *
+ * Object:
+ *
+ *   Current OTU = SUBJECT
+ *   Display OBJECT
+ *
+ * Subject:
+ *
+ *   Current OTU = OBJECT
+ *   Display SUBJECT
+ *
+ * This computed property is deliberately based
+ * on biologicalAssociations, which has already
+ * been explicitly scoped to the current OTU.
+ */
+const directedAssociations = computed(() => {
+  const currentOtuId = Number(props.otuId)
+
+  return biologicalAssociations.value.filter(
+    association => {
+
+      if (
+        selectedDirection.value === 'object'
+      ) {
+        return (
+          Number(association.subjectId) ===
+          currentOtuId
+        )
+      }
+
+      return (
+        Number(association.objectId) ===
+        currentOtuId
+      )
+    }
+  )
+})
+
+
+/*
+ * Determine which biological relationships occur
+ * in the currently selected direction.
+ *
+ * IMPORTANT:
+ *
+ * This uses directedAssociations rather than
+ * biologicalAssociations.
+ *
+ * Therefore relationship columns cannot be
+ * introduced by associations from the opposite
+ * direction.
  */
 const relationships = computed(() => {
   return [
     ...new Set(
-      biologicalAssociations.value
+      directedAssociations.value
         .map(
           association =>
             association.biologicalRelationship
@@ -342,47 +399,12 @@ const summaryRows = computed(() => {
 
 
   /*
-   * First restrict the records to the appropriate
-   * direction.
-   *
-   * OBJECT:
-   *
-   *   Current OTU is the SUBJECT
-   *   We display the OBJECT.
-   *
-   * SUBJECT:
-   *
-   *   Current OTU is the OBJECT
-   *   We display the SUBJECT.
-   */
-  const directedAssociations =
-    biologicalAssociations.value.filter(
-      association => {
-
-        if (
-          selectedDirection.value ===
-          'object'
-        ) {
-          return (
-            Number(association.subjectId) ===
-            Number(props.otuId)
-          )
-        }
-
-        return (
-          Number(association.objectId) ===
-          Number(props.otuId)
-        )
-      }
-    )
-
-
-  /*
-   * Aggregate the directed associations.
+   * Aggregate the already directionally scoped
+   * associations.
    */
   for (
     const association
-    of directedAssociations
+    of directedAssociations.value
   ) {
 
     /*
@@ -394,8 +416,17 @@ const summaryRows = computed(() => {
      * Object + Genus:
      *   objectGenus
      *
+     * Object + Family:
+     *   objectFamily
+     *
      * Subject + Species:
      *   subjectLabel
+     *
+     * Subject + Genus:
+     *   subjectGenus
+     *
+     * Subject + Family:
+     *   subjectFamily
      */
     const label =
       association[
@@ -424,7 +455,7 @@ const summaryRows = computed(() => {
 
 
     /*
-     * Create row.
+     * Create a new summary row if necessary.
      */
     if (!groups.has(key)) {
 
@@ -458,6 +489,9 @@ const summaryRows = computed(() => {
       association.biologicalRelationship
 
 
+    /*
+     * Ignore records without a relationship.
+     */
     if (!relationship) {
       continue
     }
@@ -507,15 +541,8 @@ const summaryRows = computed(() => {
 
 
 /*
- * Load ALL biological associations involving
+ * Load biological associations involving
  * the current OTU.
- *
- * This intentionally uses the SAME query as
- * your existing working panel:
- *
- *   otu_query[otu_id][]: props.otuId
- *
- * That query correctly scopes the results.
  */
 async function loadBiologicalAssociations() {
   isLoading.value = true
@@ -536,10 +563,8 @@ async function loadBiologicalAssociations() {
 
 
     /*
-     * First request.
-     *
-     * This is deliberately based on the
-     * existing working panel.
+     * The API request is still explicitly scoped
+     * using the current OTU.
      */
     const firstResponse =
       await makeAPIRequest.get(
@@ -562,7 +587,7 @@ async function loadBiologicalAssociations() {
 
 
     /*
-     * Convert the API response.
+     * Convert the first page of API records.
      */
     const firstItems =
       firstResponse.data.map(
@@ -581,10 +606,9 @@ async function loadBiologicalAssociations() {
     )
 
 
-    totalAssociations.value =
-      total
-
-
+    /*
+     * Calculate the number of pages.
+     */
     const totalPages =
       Math.ceil(
         total / perPage
@@ -600,11 +624,10 @@ async function loadBiologicalAssociations() {
 
 
     /*
-     * Fetch the remaining pages.
+     * Fetch all remaining pages.
      *
-     * Every request continues to use
-     * otu_query[otu_id][] so every record
-     * is scoped to the current OTU.
+     * Every request continues to include
+     * the current OTU query.
      */
     if (totalPages > 1) {
 
@@ -645,11 +668,51 @@ async function loadBiologicalAssociations() {
 
 
     /*
-     * Store all associations involving
-     * this OTU.
+     * DEFENSIVE CURRENT-OTU FILTER
+     *
+     * Even if the API query accidentally returns
+     * associations outside the current OTU, only
+     * retain records where the current OTU occurs
+     * on either side of the association.
+     */
+    const currentOtuId =
+      Number(props.otuId)
+
+
+    const scopedItems =
+      allItems.filter(
+        association => {
+
+          const subjectId =
+            Number(association.subjectId)
+
+          const objectId =
+            Number(association.objectId)
+
+
+          return (
+            subjectId === currentOtuId ||
+            objectId === currentOtuId
+          )
+        }
+      )
+
+
+    /*
+     * Store ONLY associations involving
+     * the current OTU.
      */
     biologicalAssociations.value =
-      allItems
+      scopedItems
+
+
+    /*
+     * The displayed total should reflect the
+     * records that actually survived the explicit
+     * current-OTU filter.
+     */
+    totalAssociations.value =
+      scopedItems.length
 
   } catch (error) {
 
