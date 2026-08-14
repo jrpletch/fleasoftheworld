@@ -12,7 +12,6 @@ taxa_page:
           - panel:content
           - panel:keys
           - panel:etymology
-          - panel:gbif
           - panel:statistics
      
   asserted_distributions:

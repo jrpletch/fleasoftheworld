@@ -5,7 +5,7 @@
     </ClientOnly>
 
     <VCardHeader>
-      Biological Associations
+      Biological Associations summary
       <span v-if="totalAssociations">
         ({{ totalAssociations }})
       </span>
@@ -14,7 +14,27 @@
     <VCardContent class="min-h-[6rem] overflow-x-auto">
       <!-- Controls -->
       <div class="flex flex-wrap gap-6 items-center mb-4">
-        <!-- Object / Subject switch -->
+        <!-- Taxonomic level -->
+        <div class="flex items-center gap-2">
+          <label
+            for="association-rank"
+            class="font-medium"
+          >
+            Taxonomic level:
+          </label>
+
+          <select
+            id="association-rank"
+            v-model="selectedRank"
+            class="border rounded px-2 py-1 bg-base-background"
+          >
+            <option value="species">Species</option>
+            <option value="genus">Genus</option>
+            <option value="family">Family</option>
+          </select>
+        </div>
+		
+		<!-- Object / Subject switch -->
         <div class="flex items-center gap-2">
           <span class="font-medium">
             Relationship direction:
@@ -47,26 +67,6 @@
               Subject
             </button>
           </div>
-        </div>
-
-        <!-- Taxonomic level -->
-        <div class="flex items-center gap-2">
-          <label
-            for="association-rank"
-            class="font-medium"
-          >
-            Taxonomic level:
-          </label>
-
-          <select
-            id="association-rank"
-            v-model="selectedRank"
-            class="border rounded px-2 py-1 bg-base-background"
-          >
-            <option value="species">Species</option>
-            <option value="genus">Genus</option>
-            <option value="family">Family</option>
-          </select>
         </div>
       </div>
 
@@ -405,7 +405,7 @@ async function fetchMissingOtuLabels(allItems) {
   for (let i = 0; i < idsToFetch.length; i += chunkSize) {
     const chunk = idsToFetch.slice(i, i + chunkSize)
     try {
-      const query = chunk.map(id => `id[]=${id}`).join('&')
+      const query = chunk.map(id => `otu_id[]=${id}`).join('&')
       const response = await makeAPIRequest.get(`/otus.json?${query}`)
       
       const newLabels = { ...fetchedOtuLabels.value }
