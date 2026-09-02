@@ -21,6 +21,9 @@ The <b>PARHOST</b> database compiled by Sergei Medvedev aggregates host associat
 
 The <b>Illustrated Catalogues of the Rothschild Collection of Fleas</b> (1953-1983) are the most comprehensive published source on global flea diversity. Though out of date, the compilation of records from the British Museum alongside numerous keys, figures, and taxonomic diagnoses make them an essential source on Siphonaptera.
 
+## Georeferencing
+Georeferences used for collection objects and type specimens are approximate and do not represent exact collection localities, unless accompanied by GPS coordinates in the original publication or dataset. While every effort has been made to trace localities, errors may still be present. If you see what appears to be an error, please let us know!
+
 ## Contact
 If you have a question, want to report new data relevant to the project, or have error our preferred means of contact is to file an issue on our [project tracker](https://github.com/our/project/tracker).
 
@@ -34,6 +37,7 @@ Made possible by the wonderful:
 * Sergei Medvedev
 * Mackenzie Kwak
 * Lance Durden
+* Sonja Matthee
 
 ## Citing
 * This website - {{frontmatter.citation}}

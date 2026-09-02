@@ -33,3 +33,7 @@ taxa_page:
   bibliography:
     panels:
       - - - panel:nomenclature-references
+      
+taxa_page_regions:
+  taxa_page:header:taxonname:after:
+      - panel:annotations
