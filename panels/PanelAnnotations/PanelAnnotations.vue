@@ -6,8 +6,8 @@
     <VBadge
       v-for="tag in tags"
       :key="tag.id"
-      color="blue"
-      size="sm"
+      color="red"
+      size="lg"
     >
       {{ tag.label }}
     </VBadge>
