@@ -1,6 +1,6 @@
 <template>
   <section>
-    <figure class="relative w-full h-[500px] sm:h-[500px] overflow-visible m-0">
+    <figure class="relative m-0 h-96 w-full overflow-hidden sm:h-[500px]">
 		<img
 			src="../public/images/NK317589.F1_Mesopsylla_habitus.png"
 			alt="NK317589.F1 Mesopsylla hebes"
