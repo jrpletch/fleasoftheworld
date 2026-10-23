@@ -72,7 +72,7 @@
           <h3 class="text-xl font-semibold">Your contributions matter</h3>
           <p class="mt-2 text-sm leading-relaxed text-white/80">
             Specimen records, images, missing papers or a simple correction:
-            every contribution makes WID more complete and more reliable.
+            every contribution makes Fleas of the World more complete and more reliable.
           </p>
           <div class="mt-5 flex flex-col sm:flex-row lg:flex-col xl:flex-row gap-3">
             <RouterLink
