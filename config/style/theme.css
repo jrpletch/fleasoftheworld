@@ -44,3 +44,8 @@
   --tp-scrollbar-thumb: rgb(156, 163, 175);
   --tp-scrollbar-track: rgb(55, 65, 81);
 }
+
+/* Long URLs in library panels (e.g. citations) must wrap inside the card. */
+.tp-card-content a {
+  overflow-wrap: anywhere;
+}

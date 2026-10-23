@@ -20,7 +20,7 @@
           <span class="flex-shrink-0">Added {{ added(s.created_at) }}</span>
         </div>
         <p
-          class="mt-1.5 text-sm leading-relaxed text-base-content/80 [&_i]:italic"
+          class="mt-1.5 text-sm leading-relaxed text-base-content/80 break-words [&_i]:italic [&_a]:break-all"
           :class="compact ? 'line-clamp-3' : ''"
           v-html="clean(s.cached)"
         />
@@ -29,7 +29,7 @@
           :href="`https://doi.org/${s.doi}`"
           target="_blank"
           rel="noopener noreferrer"
-          class="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-primary-color dark:text-secondary-color hover:underline"
+          class="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-primary-color dark:text-secondary-color hover:underline break-all"
         >
           DOI {{ s.doi }}
         </a>

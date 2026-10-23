@@ -108,7 +108,7 @@
       </p>
 
       <RouterLink
-        v-if="term.trim().length >= MIN_REFS"
+        v-if="!taxaOnly && term.trim().length >= MIN_REFS"
         :to="{ path: '/resources/tw/filter/bibliography', query: { query_term: term.trim() } }"
         class="block border-t border-base-border/40 px-4 py-2.5 text-sm font-semibold text-primary-color dark:text-secondary-color hover:bg-base-muted/30"
         @mousedown.prevent="goBibliography"
@@ -128,8 +128,12 @@ const props = defineProps({
   placeholder: { type: String, default: 'Search taxa, references or authors…' },
   autofocus: { type: Boolean, default: false },
   // 'hero' (large, light input) or 'dark' (translucent input on the navy band)
-  variant: { type: String, default: 'hero' }
+  variant: { type: String, default: 'hero' },
+  // Only search taxa and emit 'select-taxon' with the OTU id instead of navigating
+  taxaOnly: { type: Boolean, default: false }
 })
+
+const emit = defineEmits(['select-taxon'])
 
 const MIN_TAXA = 2
 const MIN_REFS = 3
@@ -186,7 +190,7 @@ async function search(q, id) {
     )
   }
 
-  if (q.length >= MIN_REFS) {
+  if (!props.taxaOnly && q.length >= MIN_REFS) {
     loading.value.refs = true
     loading.value.people = true
 
@@ -258,8 +262,8 @@ watch(term, (value) => {
   clearResults()
   loading.value = {
     taxa: true,
-    refs: q.length >= MIN_REFS,
-    people: q.length >= MIN_REFS
+    refs: !props.taxaOnly && q.length >= MIN_REFS,
+    people: !props.taxaOnly && q.length >= MIN_REFS
   }
 
   timer = setTimeout(() => {
@@ -289,7 +293,9 @@ function close() {
 }
 
 function choose(item) {
-  if (item.type === 'taxa') {
+  if (item.type === 'taxa' && props.taxaOnly) {
+    emit('select-taxon', item.otuId)
+  } else if (item.type === 'taxa') {
     router.push({ name: 'otus-id-overview', params: { id: item.otuId } })
   } else if (item.type === 'refs') {
     router.push({ path: '/resources/tw/filter/bibliography', query: { query_term: item.title } })
@@ -319,7 +325,7 @@ function onKeydown(e) {
     e.preventDefault()
     const item = flatItems.value[activeIndex.value] || flatItems.value[0]
     if (item) choose(item)
-    else if (term.value.trim().length >= MIN_REFS) goBibliography()
+    else if (!props.taxaOnly && term.value.trim().length >= MIN_REFS) goBibliography()
   } else if (e.key === 'Escape') {
     close()
     inputEl.value?.blur()
@@ -359,11 +365,27 @@ onBeforeUnmount(() => {
 }
 
 .wid-gsearch--hero .wid-gsearch__input:focus {
-  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.6), 0 0 0 3px rgb(var(--color-secondary));
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.6), 0 0 0 3px var(--tp-secondary);
 }
 
 .wid-gsearch--hero .wid-gsearch__icon {
   color: #6b7280;
+}
+
+.wid-gsearch--page .wid-gsearch__input {
+  height: 3.25rem;
+  border-radius: 0.75rem;
+  background: var(--tp-base-foreground);
+  color: var(--tp-base-content);
+  box-shadow: 0 0 0 1px var(--tp-base-border);
+}
+
+.wid-gsearch--page .wid-gsearch__input:focus {
+  box-shadow: 0 0 0 2px var(--tp-secondary);
+}
+
+.wid-gsearch--page .wid-gsearch__icon {
+  color: var(--tp-base-soft);
 }
 
 .wid-gsearch--dark .wid-gsearch__input {

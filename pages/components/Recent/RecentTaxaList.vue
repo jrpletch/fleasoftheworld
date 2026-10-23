@@ -14,7 +14,7 @@
           :key="opt.label"
           type="button"
           class="px-3 py-1.5 rounded-md font-medium transition-colors"
-          :class="rank === opt.value ? 'bg-primary-color text-primary-content' : 'text-base-content/70 hover:text-base-content'"
+          :class="rank === opt.value ? 'bg-secondary text-secondary-content shadow' : 'text-base-content/70 hover:text-base-content'"
           :aria-pressed="rank === opt.value"
           @click="setRank(opt.value)"
         >
@@ -80,6 +80,11 @@
                   v-html="item.cached_html"
                 />
                 <span class="text-base-content/55">{{ "\u00a0" + (item.cached_author_year || "") }}</span>
+                <span
+                  v-if="item.isHost"
+                  class="ml-2 inline-block whitespace-nowrap rounded-md bg-blue-100 px-2 py-0.5 align-middle text-[11px] font-semibold uppercase tracking-wide text-blue-800 dark:bg-blue-400/15 dark:text-blue-300"
+                  >host</span
+                >
               </span>
               <svg
                 v-if="item.otuId"
@@ -135,14 +140,17 @@ const RANKS = [
   { label: 'Species', value: 'NomenclaturalRank::Iczn::SpeciesGroup::Species' }
 ]
 
+// Siphonaptera OTU, same scope as the taxonomy page
+const FLEA_OTU_ID = 1366469
+
 const rank = ref('')
+const fleaTaxonNameId = ref(null)
 const list = ref([])
 const total = ref(0)
 const page = ref(0)
 const loading = ref(false)
 
 const RANK_CLASS = {
-  genus: 'bg-primary-color/10 text-primary-color dark:bg-primary-color/30 dark:text-blue-200',
   species: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-400/15 dark:text-emerald-300',
   subspecies: 'bg-teal-100 text-teal-800 dark:bg-teal-400/15 dark:text-teal-300'
 }
@@ -168,9 +176,29 @@ const groups = computed(() => {
   return out
 })
 
+// The taxon_names endpoint ignores ancestor_id, so check each name's ancestor chain.
+const fleaCache = new Map()
+function isFlea(id) {
+  if (!fleaCache.has(id)) {
+    fleaCache.set(
+      id,
+      makeAPIRequest
+        .get('/taxon_names', { params: { taxon_name_id: [id], ancestors: true, per: 200 } })
+        .then(({ data }) => data.some((t) => t.id === fleaTaxonNameId.value))
+        .catch(() => true)
+    )
+  }
+  return fleaCache.get(id)
+}
+
 async function load(next) {
   loading.value = true
   try {
+    if (!fleaTaxonNameId.value) {
+      const { data: otu } = await makeAPIRequest.get(`/otus/${FLEA_OTU_ID}`)
+      fleaTaxonNameId.value = otu.taxon_name_id
+    }
+
     const { data, headers } = await makeAPIRequest.get('/taxon_names', {
       params: {
         validity: true,
@@ -185,15 +213,20 @@ async function load(next) {
     total.value = Number(headers['pagination-total']) || 0
 
     let otus = []
+    let fleaIds = new Set()
     if (data.length) {
-      const res = await makeAPIRequest.get('/otus', {
-        params: { taxon_name_id: data.map((t) => t.id), per: data.length * 2 }
-      })
-      otus = res.data
+      const ids = data.map((t) => t.id)
+      const [otuRes, fleaFlags] = await Promise.all([
+        makeAPIRequest.get('/otus', { params: { taxon_name_id: ids, per: data.length * 2 } }),
+        Promise.all(ids.map(isFlea))
+      ])
+      otus = otuRes.data
+      fleaIds = new Set(ids.filter((_, i) => fleaFlags[i]))
     }
 
     const items = data.map((t) => ({
       ...t,
+      isHost: !fleaIds.has(t.id),
       otuId: otus.find((o) => o.taxon_name_id === t.id)?.id || null
     }))
     list.value = next === 1 ? items : [...list.value, ...items]
