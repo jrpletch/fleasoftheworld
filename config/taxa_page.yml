@@ -1,7 +1,7 @@
 taxa_page:
   overview:
     panels:
-      - - - panel:gallery
+      - - - panel:flea-gallery
           - panel:type
           - panel:type-specimen
           - panel:nomenclature
