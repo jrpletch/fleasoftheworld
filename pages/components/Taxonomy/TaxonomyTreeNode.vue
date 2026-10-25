@@ -10,8 +10,10 @@
         type="button"
         class="flex h-5 w-5 flex-shrink-0 items-center justify-center rounded text-base-content/60 hover:bg-base-muted/50"
         :aria-expanded="isOpen"
+        :disabled="treeBuilding"
+        :class="treeBuilding ? 'cursor-wait opacity-50' : ''"
         aria-label="Toggle descendants"
-        @click="isOpen = !isOpen"
+        @click="toggleChildren"
       >
         <svg
           class="h-3.5 w-3.5 transition-transform"
@@ -60,23 +62,25 @@
       </li>
     </ul>
 
-    <ul
-      v-if="isOpen"
-      class="ml-2.5 border-l border-base-border/60 pl-3"
-    >
-      <li
-        v-if="loading"
-        class="py-1 text-base-content/50"
+    <Transition name="taxonomy-branch">
+      <ul
+        v-if="isOpen"
+        class="ml-2.5 border-l border-base-border/60 pl-3"
       >
-        Loading…
-      </li>
-      <TaxonomyTreeNode
-        v-for="child in children"
-        :key="child.otu_id"
-        :node="child"
-        :path="childPath(child)"
-      />
-    </ul>
+        <li
+          v-if="loading"
+          class="py-1 text-base-content/50"
+        >
+          Loading…
+        </li>
+        <TaxonomyTreeNode
+          v-for="child in children"
+          :key="child.otu_id"
+          :node="child"
+          :path="childPath(child)"
+        />
+      </ul>
+    </Transition>
   </li>
 </template>
 
@@ -100,8 +104,16 @@ function fetchCount(otuId) {
     countCache.set(
       otuId,
       makeAPIRequest
-        .get(`/otus/${otuId}`)
+        .get(`/otus/${otuId}`, { params: { extend: ['taxon_name'] } })
         .then(async ({ data: otu }) => {
+          const rank = String(otu.taxon_name?.rank || '').toLowerCase()
+          if (rank === 'subspecies') return null
+
+          if (rank === 'species') {
+            const subspecies = await countRank(otu.taxon_name_id, SUBSPECIES_RANK)
+            return subspecies ? { n: subspecies, unit: 'subspecies' } : null
+          }
+
           const species = await countRank(otu.taxon_name_id, SPECIES_RANK)
           if (species) return { n: species, unit: 'species' }
           const subspecies = await countRank(otu.taxon_name_id, SUBSPECIES_RANK)
@@ -115,7 +127,7 @@ function fetchCount(otuId) {
 </script>
 
 <script setup>
-import { computed, inject, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, inject, nextTick, onMounted, ref, shallowRef, watch } from 'vue'
 import { RouterLink } from 'vue-router'
 
 const props = defineProps({
@@ -127,15 +139,28 @@ const props = defineProps({
 
 const rowEl = ref(null)
 const showInvalid = inject('showInvalid', ref(true))
+const expandThrough = inject('expandThrough', ref(''))
+const treeBuilding = inject('treeBuilding', ref(false))
+const clearTaxonHighlight = inject('clearTaxonHighlight', () => {})
+const trackTreeOverride = inject('trackTreeOverride', () => {})
+const resetTreeVersion = inject('resetTreeVersion', ref(0))
 const speciesCount = ref(null)
-const isOpen = ref(props.defaultOpen)
-const children = ref([...(props.node.descendants || [])])
+const defaultOpen = computed(() => Boolean(props.defaultOpen || props.node.expand_open))
+const isOpen = ref(defaultOpen.value)
+const children = shallowRef([...(props.node.descendants || [])])
 const loading = ref(false)
 
 const highlighted = computed(() => props.path.length === 1 && props.path[0] === props.node.otu_id)
 
+function toggleChildren() {
+  const nextOpen = !isOpen.value
+  if (isOpen.value) clearTaxonHighlight()
+  isOpen.value = nextOpen
+  trackTreeOverride(props.node.otu_id, nextOpen !== defaultOpen.value)
+}
+
 async function loadChildren() {
-  if (children.value.length || props.node.leaf_node) return
+  if (children.value.length || props.node.leaf_node || expandThrough.value) return
   loading.value = true
   try {
     const { data } = await makeAPIRequest.get(`/otus/${props.node.otu_id}/inventory/taxonomy.json`, {
@@ -154,28 +179,98 @@ const childPath = (child) =>
     ? props.path.slice(1)
     : []
 
-watch(isOpen, (open) => open && loadChildren(), { immediate: true })
+if (!expandThrough.value) {
+  watch(isOpen, (open) => open && loadChildren(), { immediate: true })
+}
 
-onMounted(async () => {
-  if (props.node.leaf_node) return
-  speciesCount.value = await fetchCount(props.node.otu_id)
+watch(defaultOpen, (open) => {
+  if (expandThrough.value) isOpen.value = open
 })
 
 watch(
-  () => props.path,
-  (p) => {
-    if (p.length > 1 && p[0] === props.node.otu_id) isOpen.value = true
-  },
-  { immediate: true }
+  () => props.node.descendants,
+  (descendants) => {
+    children.value = [...(Array.isArray(descendants) ? descendants : [])]
+  }
 )
 
-watch(
-  highlighted,
-  async (on) => {
-    if (!on) return
-    await nextTick()
-    rowEl.value?.scrollIntoView({ block: 'center', behavior: 'smooth' })
-  },
-  { immediate: true }
-)
+watch(resetTreeVersion, () => {
+  if (!props.defaultOpen) {
+    isOpen.value = false
+    trackTreeOverride(props.node.otu_id, false)
+  }
+})
+
+function updateSpeciesCount() {
+  const species = props.node.species_count
+  const subspecies = props.node.subspecies_count || 0
+  const rank = props.node.display_rank
+
+  if (rank === 'subspecies') {
+    speciesCount.value = null
+  } else if (rank === 'species') {
+    speciesCount.value = subspecies ? { n: subspecies, unit: 'subspecies' } : null
+  } else {
+    speciesCount.value = species
+      ? { n: species, unit: 'species' }
+      : subspecies
+        ? { n: subspecies, unit: 'subspecies' }
+        : null
+  }
+}
+
+if (expandThrough.value) {
+  if (Number.isFinite(props.node.species_count)) updateSpeciesCount()
+  watch(
+    () => [props.node.species_count, props.node.subspecies_count],
+    () => {
+      if (Number.isFinite(props.node.species_count)) updateSpeciesCount()
+    }
+  )
+} else if (!props.node.leaf_node) {
+  onMounted(async () => {
+    speciesCount.value = await fetchCount(props.node.otu_id)
+  })
+}
+
+if (props.path.length) {
+  watch(
+    () => props.path,
+    (p) => {
+      if (p.length > 1 && p[0] === props.node.otu_id) isOpen.value = true
+    },
+    { immediate: true }
+  )
+}
+
+if (props.path.length === 1) {
+  watch(
+    highlighted,
+    async (on) => {
+      if (!on) return
+      await nextTick()
+      rowEl.value?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    },
+    { immediate: true }
+  )
+}
 </script>
+
+<style scoped>
+.taxonomy-branch-enter-active,
+.taxonomy-branch-leave-active {
+  transition: opacity 120ms ease;
+}
+
+.taxonomy-branch-enter-from,
+.taxonomy-branch-leave-to {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .taxonomy-branch-enter-active,
+  .taxonomy-branch-leave-active {
+    transition: none;
+  }
+}
+</style>

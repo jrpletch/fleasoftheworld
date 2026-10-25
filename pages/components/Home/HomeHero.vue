@@ -93,6 +93,7 @@ const { base_url = '/' } = __APP_ENV__
 const specimenImageUrl = `${base_url}images/Barreropsylla_excelsa_RDS-16914_10X.webp`
 
 const quickLinks = [
+  { label: 'Checklists', to: '/checklists', icon: 'pin' },
   { label: 'Techniques', to: '/techniques', icon: 'document' },
   { label: 'Keys', to: '/keys', icon: 'key' },
   { label: 'Bibliography', to: '/resources/tw/filter/bibliography', icon: 'book' },

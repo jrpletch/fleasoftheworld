@@ -7,18 +7,29 @@
 
 #    - label: News
 #      link: /news
-    - label: Taxonomy
-      link: /taxonomy
+    - label: Explore
+      submenu:
+        - label: Taxonomy
+          link: /taxonomy
+        - label: Checklists
+          link: /checklists
+        - label: Search DwC
+          link: /resources/tw/filter/dwc_otus
 
-    - label: Search DwC
-      link: /resources/tw/filter/dwc_otus
+    - label: Guides
+      submenu:
+        - label: Techniques
+          link: /techniques
+        - label: Morphology
+          link: /morphology
 
-    - label: Bibliography
-      link: /resources/tw/filter/bibliography
-            
-    - label: Flea collections
-      link: /collections
-    
+    - label: Resources
+      submenu:
+        - label: Bibliography
+          link: /resources/tw/filter/bibliography
+        - label: Flea collections
+          link: /collections
+
     - label: Flea News
       link: /fleanews
 

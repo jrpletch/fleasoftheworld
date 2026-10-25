@@ -49,3 +49,11 @@
 .tp-card-content a {
   overflow-wrap: anywhere;
 }
+
+.tp-header .tp-mobile-navbar {
+  z-index: 5000 !important;
+}
+
+.country-checklist-map .leaflet-interactive:focus:not(:focus-visible) {
+  outline: none;
+}

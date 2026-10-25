@@ -42,6 +42,12 @@ import HomeIcon from './HomeIcon.vue'
 
 const cards = [
   {
+    to: '/checklists',
+    title: 'Country checklists',
+    text: 'Explore reported flea species on a world map and browse country checklists with their references.',
+    cta: 'Browse checklists'
+  },
+  {
     to: '/techniques',
     title: 'Flea techniques',
     text: 'Practical guidance on collecting fleas, mounting specimens, and extracting DNA.',
