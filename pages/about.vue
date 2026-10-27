@@ -90,7 +90,6 @@
           <li>Mike Hastriter</li>
           <li>Bob Bossard</li>
           <li>Sergei Medvedev</li>
-          <li>Mackenzie Kwak</li>
           <li>Lance Durden</li>
           <li>Sonja Matthee</li>
         </ul>

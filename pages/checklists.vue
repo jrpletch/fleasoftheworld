@@ -57,7 +57,7 @@
             />
             {{ step.label }}
           </span>
-          <span class="text-base-content/55">Click a country to view its checklist.</span>
+          <span class="text-base-content/55">Click a country to view its checklist. For the United States, Canada, Australia, China, Russia and the United Kingdom, click a state, province or constituent country to narrow it.</span>
         </div>
         <div
           v-if="recommendedCitation"
@@ -90,6 +90,27 @@
             {{ country.name }} ({{ country.count }})
           </option>
         </select>
+
+        <template v-if="regionOptions.length">
+          <label class="mt-3 block text-sm font-semibold" for="distribution-region">
+            {{ regionLabel }}
+          </label>
+          <select
+            id="distribution-region"
+            class="mt-1.5 box-border block w-full min-w-0 max-w-full rounded-md border border-base-border bg-base-foreground px-3 py-2.5 font-normal focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            :value="selectedRegion"
+            @change="selectRegion($event.target.value)"
+          >
+            <option value="">All of {{ selectedCountry }}</option>
+            <option
+              v-for="region in regionOptions"
+              :key="region.name"
+              :value="region.name"
+            >
+              {{ region.name }} ({{ region.count }})
+            </option>
+          </select>
+        </template>
 
         <p
           v-if="countsLoading"
@@ -125,12 +146,18 @@
                   alt=""
                   aria-hidden="true"
                 />
-                <span>{{ selectedCountry }}</span>
+                <span>{{ selectedRegion ? `${selectedRegion}, ${selectedCountry}` : selectedCountry }}</span>
               </h2>
               <span class="shrink-0 text-sm tabular-nums text-base-content/65">
-                {{ selectedCountryCount }} species
+                {{ displayedSpeciesCount }} species
               </span>
             </div>
+            <button
+              v-if="selectedRegion"
+              class="text-xs font-medium text-primary-color hover:underline dark:text-secondary-color"
+              type="button"
+              @click="selectRegion('')"
+            >← All of {{ selectedCountry }}</button>
             <div
               v-if="!countryLoading && !countryError && species.length"
               class="flex flex-wrap items-center gap-2"
@@ -301,7 +328,7 @@
                   </ul>
                 </template>
                 <p v-else class="text-sm text-base-content/65">
-                  No flea species occurrence records are currently indexed for {{ selectedCountry }}.
+                  No flea species occurrence records are                   currently indexed for {{ selectionLabel }}.
                 </p>
               </section>
 
@@ -356,7 +383,7 @@
                   </li>
                 </ol>
                 <p v-else class="text-sm text-base-content/65">
-                  No cited references are currently indexed for {{ selectedCountry }}.
+                  No cited references are currently indexed for {{ selectionLabel }}.
                 </p>
               </section>
         </div>
@@ -392,6 +419,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { makeAPIRequest } from '@/utils/request'
+import { buildSubdivisionIndex, resolveSubdivision } from './data/subdivisions.js'
 
 const {
   base_url = '/',
@@ -401,7 +429,7 @@ const {
 const PAGE_SIZE = 500
 const PAGE_BATCH_SIZE = 8
 const DISTRIBUTION_PLACE_BATCH_SIZE = 100
-const INDEX_CACHE_KEY = 'fleas-country-species-counts-v2'
+const INDEX_CACHE_KEY = 'fleas-country-species-counts-v4'
 const INDEX_CACHE_AGE = 24 * 60 * 60 * 1000
 
 const legend = [
@@ -421,6 +449,20 @@ const countsLoading = ref(true)
 const countsError = ref('')
 const mapError = ref('')
 const selectedCountry = ref('')
+const selectedRegion = ref('')
+const subdivisionGeoJson = ref(null)
+let subdivisionLayer = null
+const subdivisionsShown = ref(false)
+let subdivisionLayerRequestId = 0
+let loadedCountry = null
+const REGION_LABELS = {
+  'united states': 'State',
+  canada: 'Province or territory',
+  australia: 'State or territory',
+  china: 'Province',
+  russia: 'Region',
+  'united kingdom': 'Constituent country'
+}
 const countryLoading = ref(false)
 const countryError = ref('')
 const countryRows = ref([])
@@ -437,6 +479,22 @@ let countryRequestId = 0
 let pendingCountryScrollY = null
 
 const countryAliases = {
+  serbia: 'republic of serbia',
+  'faeroe is.': 'faroe islands',
+  macedonia: 'north macedonia',
+  'french southern territories': 'french southern and antarctic lands',
+  swaziland: 'eswatini',
+  korea: 'south korea',
+  'dem. rep. korea': 'north korea',
+  'w. sahara': 'western sahara',
+  'bosnia and herz.': 'bosnia and herzegovina',
+  'côte d\'ivoire': 'ivory coast',
+  'eq. guinea': 'equatorial guinea',
+  'hong kong': 'hong kong s.a.r.',
+  'christmas island': 'indian ocean territories',
+  'svalbard and jan mayen': 'svalbard and jan mayen',
+  'south georgia and the south sandwich islands': 'south georgia and the islands',
+  'cape verde': 'cabo verde',
   'united states of america': 'united states',
   usa: 'united states',
   'russian federation': 'russia',
@@ -478,17 +536,6 @@ function speciesKey(record) {
   return `${String(record.scientificName || '').trim()} ${String(record.scientificNameAuthorship || '').trim()}`.trim().toLocaleLowerCase()
 }
 
-function speciesConceptKey(record) {
-  return speciesConceptName(record).toLocaleLowerCase()
-}
-
-function speciesConceptName(record) {
-  const name = bareName(record)
-  const parts = name.split(/\s+/).filter(Boolean)
-  if (/subspecies/i.test(String(record.taxonRank || '')) && parts.length >= 3) parts.pop()
-  return parts.join(' ')
-}
-
 async function forEachOccurrencePage(params, onPage) {
   const first = await makeAPIRequest.get('/dwc_occurrences', {
     params: { ...params, per: PAGE_SIZE, page: 1 }
@@ -513,7 +560,7 @@ async function forEachOccurrencePage(params, onPage) {
 
 async function loadCountryShapes() {
   try {
-    const response = await fetch(`${base_url}data/countries.geojson`)
+    const response = await fetch(`${base_url}data/countries.geojson`, { cache: 'no-cache' })
     if (!response.ok) throw new Error('Could not load country boundaries.')
     const data = await response.json()
     countryGeoJson.value = data
@@ -560,7 +607,7 @@ async function loadCountryCounts() {
         if (!namesByKey.has(key)) namesByKey.set(key, new Set())
         namesByKey.get(key).add(String(record.country).trim())
         if (!speciesByCountry.has(key)) speciesByCountry.set(key, new Set())
-        speciesByCountry.get(key).add(speciesConceptKey(record))
+        speciesByCountry.get(key).add(speciesKey(record))
       }
     })
     countriesByKey.value = new Map(
@@ -614,7 +661,13 @@ function countryStyle(feature) {
   const name = feature.properties?.name || ''
   const count = countryCounts.value.get(countryKey(name)) || 0
   const selected = countryKey(name) === countryKey(selectedCountry.value)
+  if (selected && subdivisionsShown.value) {
+    if (selectedRegion.value) return { weight: 0, opacity: 0, fill: false }
+    return { color: '#f3b637', weight: 3.5, opacity: 1, fill: false }
+  }
   return {
+    fill: true,
+    opacity: 1,
     color: selected ? '#f3b637' : '#ffffff',
     weight: selected ? 3.5 : 0.6,
     fillColor: colorForCount(count),
@@ -623,9 +676,47 @@ function countryStyle(feature) {
 }
 
 function refreshMapStyles() {
+  const selectedKey = countryKey(selectedCountry.value)
   for (const [name, layer] of mapLayers) {
     layer.setStyle(countryStyle({ properties: { name } }))
+    const element = layer.getElement?.()
+    if (element) {
+      // Only the selected country's outline ignores clicks, and only while its subdivisions are shown.
+      element.style.pointerEvents = subdivisionsShown.value && countryKey(name) === selectedKey ? 'none' : ''
+    }
   }
+}
+
+// Bounds of the main landmasses only, so far-flung islands and antimeridian
+// crossings (Alaska's Aleutians, Chukotka, Chatham Islands) don't zoom out to the whole world.
+function mainlandBounds(geometry) {
+  if (!geometry) return null
+  const polygons = geometry.type === 'Polygon'
+    ? [geometry.coordinates]
+    : geometry.type === 'MultiPolygon' ? geometry.coordinates : []
+  const boxes = polygons.map((polygon) => {
+    let south = 90, north = -90, west = 180, east = -180
+    for (const [lng, lat] of polygon[0]) {
+      south = Math.min(south, lat)
+      north = Math.max(north, lat)
+      west = Math.min(west, lng)
+      east = Math.max(east, lng)
+    }
+    return { south, north, west, east, area: (north - south) * (east - west) }
+  })
+  if (!boxes.length) return null
+  const largest = Math.max(...boxes.map((box) => box.area))
+  const main = boxes.filter((box) => box.area >= largest * 0.05)
+  const south = Math.min(...main.map((box) => box.south))
+  const north = Math.max(...main.map((box) => box.north))
+  const west = Math.min(...main.map((box) => box.west))
+  const east = Math.max(...main.map((box) => box.east))
+  return [[south, west], [north, east]]
+}
+
+// Canada's mainland extent would otherwise include the Arctic archipelago.
+const COUNTRY_VIEW_OVERRIDES = {
+  canada: [[41.5, -141.5], [70, -52]]
 }
 
 function focusMapOnCountry() {
@@ -638,8 +729,9 @@ function focusMapOnCountry() {
 
   const layer = [...mapLayers.entries()]
     .find(([name]) => countryKey(name) === countryKey(selectedCountry.value))?.[1]
-  const bounds = layer?.getBounds?.()
-  if (bounds?.isValid()) {
+  const bounds = COUNTRY_VIEW_OVERRIDES[countryKey(selectedCountry.value)]
+    || mainlandBounds(layer?.feature?.geometry) || layer?.getBounds?.()
+  if (bounds && (Array.isArray(bounds) || bounds.isValid())) {
     layer.bringToFront()
     map.fitBounds(bounds, { padding: [24, 24], maxZoom: 5 })
   }
@@ -647,6 +739,7 @@ function focusMapOnCountry() {
 
 function onCountryMapReady() {
   focusMapOnCountry()
+  updateSubdivisionLayer()
 }
 
 const geojsonOptions = () => ({
@@ -656,7 +749,7 @@ const geojsonOptions = () => ({
     if (!name) return
     mapLayers.set(name, layer)
     const count = countryCounts.value.get(countryKey(name)) || 0
-    layer.bindTooltip(`${name}: ${count} reported species`)
+    layer.bindTooltip(`${name}: ${count} reported species`, { sticky: true })
     layer.on('click', () => {
       const option = countries.value.find((country) => country.key === countryKey(name))
       selectCountry(option?.name || name)
@@ -669,23 +762,39 @@ const geojsonOptions = () => ({
   }
 })
 
-function selectCountry(name) {
-  const query = name ? `?country=${encodeURIComponent(name)}` : ''
+function selectCountry(name, region = '') {
+  const params = new URLSearchParams()
+  if (name) params.set('country', name)
+  if (name && region) params.set('region', region)
+  const query = params.toString() ? `?${params.toString().replace(/\+/g, '%20')}` : ''
   pendingCountryScrollY = window.scrollY
   window.location.hash = `/checklists${query}`
+}
+
+function selectRegion(region) {
+  selectCountry(selectedCountry.value, region)
 }
 
 function syncCountryFromHash() {
   const [path, query = ''] = window.location.hash.slice(1).split('?')
   if (path !== '/checklists') return
-  selectedCountry.value = new URLSearchParams(query).get('country') || ''
+  const params = new URLSearchParams(query)
+  const country = params.get('country') || ''
+  selectedRegion.value = country ? params.get('region') || '' : ''
+  speciesFilter.value = ''
+  expandedTaxonKey.value = ''
+  expandedReferenceKey.value = ''
   checklistCitationUrl.value = window.location.href
   citationAccessDate.value = new Date().toLocaleDateString('en-GB', {
     day: 'numeric',
     month: 'long',
     year: 'numeric'
   })
-  loadCountry(selectedCountry.value)
+  if (country !== loadedCountry) {
+    loadedCountry = country
+    selectedCountry.value = country
+    loadCountry(country)
+  }
   if (pendingCountryScrollY !== null) {
     const scrollY = pendingCountryScrollY
     pendingCountryScrollY = null
@@ -693,11 +802,159 @@ function syncCountryFromHash() {
   }
 }
 
+const selectionLabel = computed(() => (
+  selectedRegion.value ? `${selectedRegion.value}, ${selectedCountry.value}` : selectedCountry.value
+))
+
 const recommendedCitation = computed(() => {
   if (!selectedCountry.value || !checklistCitationUrl.value || !citationAccessDate.value) return ''
   const authors = projectAuthors || projectName
-  return `${authors} (${new Date().getFullYear()}). ${projectName}: ${selectedCountry.value} checklist. Accessed ${citationAccessDate.value}. ${checklistCitationUrl.value}`
+  return `${authors} (${new Date().getFullYear()}). ${projectName}: ${selectionLabel.value} checklist. Accessed ${citationAccessDate.value}. ${checklistCitationUrl.value}`
 })
+
+const regionLabel = computed(() => REGION_LABELS[countryKey(selectedCountry.value)] || 'Region')
+
+const countrySubdivisions = computed(() => {
+  const key = countryKey(selectedCountry.value)
+  if (!REGION_LABELS[key] || !subdivisionGeoJson.value) return []
+  return subdivisionGeoJson.value.features.filter((feature) => countryKey(feature.properties.country) === key)
+})
+
+const subdivisionIndex = computed(() => (
+  countrySubdivisions.value.length ? buildSubdivisionIndex(countrySubdivisions.value) : null
+))
+
+function recordRegion(record) {
+  if (!subdivisionIndex.value) return ''
+  const shapeName = distributionPlacesByOccurrence.value.get(String(record.dwc_occurrence_object_id || ''))
+  return resolveSubdivision(subdivisionIndex.value, record.stateProvince, shapeName, record.county)
+}
+
+const scopedRows = computed(() => (
+  selectedRegion.value
+    ? countryRows.value.filter((record) => recordRegion(record) === selectedRegion.value)
+    : countryRows.value
+))
+
+const regionCounts = computed(() => {
+  const speciesByRegion = new Map()
+  for (const record of countryRows.value) {
+    if (!isSpeciesRecord(record)) continue
+    const region = recordRegion(record)
+    if (!region) continue
+    if (!speciesByRegion.has(region)) speciesByRegion.set(region, new Set())
+    speciesByRegion.get(region).add(speciesKey(record))
+  }
+  return new Map([...speciesByRegion.entries()].map(([region, set]) => [region, set.size]))
+})
+
+const regionOptions = computed(() => countrySubdivisions.value
+  .map((feature) => ({ name: feature.properties.name, count: regionCounts.value.get(feature.properties.name) || 0 }))
+  .filter((region) => region.count || region.name === selectedRegion.value)
+  .sort((a, b) => a.name.localeCompare(b.name)))
+
+const displayedSpeciesCount = computed(() => {
+  if (!selectedRegion.value) return selectedCountryCount.value
+  return regionCounts.value.get(selectedRegion.value) || 0
+})
+
+async function loadSubdivisions() {
+  if (subdivisionGeoJson.value) return
+  try {
+    const response = await fetch(`${base_url}data/subdivisions.geojson`)
+    if (!response.ok) throw new Error('Could not load subdivision boundaries.')
+    subdivisionGeoJson.value = await response.json()
+  } catch {
+    mapError.value = 'State and province boundaries could not be loaded.'
+  }
+}
+
+function subdivisionStyle(feature) {
+  const name = feature.properties.name
+  const count = regionCounts.value.get(name) || 0
+  const selected = name === selectedRegion.value
+  return {
+    color: selected ? '#f3b637' : '#ffffff',
+    weight: selected ? 3.5 : 0.8,
+    fillColor: colorForCount(count),
+    fillOpacity: count ? 0.9 : 0.5
+  }
+}
+
+async function updateSubdivisionLayer() {
+  const requestId = ++subdivisionLayerRequestId
+  subdivisionsShown.value = false
+  refreshMapStyles()
+  if (!REGION_LABELS[countryKey(selectedCountry.value)]) {
+    subdivisionLayer?.remove()
+    subdivisionLayer = null
+    return
+  }
+  await loadSubdivisions()
+  const map = countryMapRef.value?.getMapObject?.()
+  if (!map) return
+  subdivisionLayer?.remove()
+  subdivisionLayer = null
+  const { default: L } = await import('leaflet')
+  if (requestId !== subdivisionLayerRequestId || !countrySubdivisions.value.length) return
+
+  subdivisionLayer = L.geoJSON(
+    { type: 'FeatureCollection', features: countrySubdivisions.value },
+    {
+      style: subdivisionStyle,
+      onEachFeature: (feature, layer) => {
+        const name = feature.properties.name
+        layer.bindTooltip(() => `${name}: ${regionCounts.value.get(name) || 0} reported species`, { sticky: true })
+        layer.on('click', (event) => {
+          L.DomEvent.stopPropagation(event)
+          selectRegion(name === selectedRegion.value ? '' : name)
+        })
+        layer.on('mouseover', (event) => event.target.setStyle({
+          weight: name === selectedRegion.value ? 3.5 : 1.8,
+          fillOpacity: 1
+        }))
+        layer.on('mouseout', () => layer.setStyle(subdivisionStyle(feature)))
+      }
+    }
+  ).addTo(map)
+  subdivisionsShown.value = true
+  refreshMapStyles()
+  focusMapOnSelection()
+  raiseCountryOutline()
+}
+
+// Keep the gold country outline above the subdivisions without intercepting their clicks.
+function raiseCountryOutline() {
+  if (!subdivisionsShown.value) return
+  const layer = [...mapLayers.entries()]
+    .find(([name]) => countryKey(name) === countryKey(selectedCountry.value))?.[1]
+  if (!layer) return
+  layer.bringToFront()
+  const element = layer.getElement?.()
+  if (element) element.style.pointerEvents = 'none'
+}
+
+function restyleSubdivisions() {
+  subdivisionLayer?.setStyle(subdivisionStyle)
+}
+
+function focusMapOnSelection() {
+  if (selectedRegion.value && subdivisionLayer) {
+    const map = countryMapRef.value?.getMapObject?.()
+    const layer = subdivisionLayer.getLayers().find((item) => item.feature.properties.name === selectedRegion.value)
+    const bounds = mainlandBounds(layer?.feature?.geometry) || layer?.getBounds?.()
+    if (map && bounds && (Array.isArray(bounds) || bounds.isValid())) {
+      subdivisionLayer.bringToFront()
+      layer.bringToFront()
+      map.fitBounds(bounds, { padding: [24, 24], maxZoom: 6 })
+      raiseCountryOutline()
+      return
+    }
+  }
+  focusMapOnCountry()
+  subdivisionLayer?.bringToFront()
+  raiseCountryOutline()
+}
 
 function bareName(record) {
   const name = String(record.scientificName || '').trim()
@@ -709,7 +966,7 @@ function bareName(record) {
 
 const species = computed(() => {
   const byTaxon = new Map()
-  for (const record of countryRows.value) {
+  for (const record of scopedRows.value) {
     if (!isSpeciesRecord(record)) continue
     const key = speciesKey(record)
     if (!key) continue
@@ -731,6 +988,7 @@ const filteredSpecies = computed(() => {
   if (!query) return species.value
   return species.value.filter((taxon) => `${taxon.name} ${taxon.authorship}`.toLocaleLowerCase().includes(query))
 })
+
 
 function splitReferences(value) {
   return String(value || '').split(/\s*\|\s*/).map((reference) => reference.trim()).filter(Boolean)
@@ -821,7 +1079,7 @@ function citationsForRecord(record) {
 
 function countryExportRows() {
   const rows = []
-  for (const record of countryRows.value) {
+  for (const record of scopedRows.value) {
     if (!isSpeciesRecord(record)) continue
     const isDistribution = record.dwc_occurrence_object_type === 'AssertedDistribution'
     const isSpecimen = record.dwc_occurrence_object_type === 'CollectionObject' || record.basisOfRecord === 'PreservedSpecimen'
@@ -886,7 +1144,7 @@ function downloadCountryCSV() {
     .map((row) => row.map(csvCell).join(','))
     .join('\r\n')
   const date = new Date().toISOString().slice(0, 10)
-  downloadFile(`FleasOfTheWorld_${exportSlug(selectedCountry.value)}_checklist_${date}.csv`, `\ufeff${csv}`, 'text/csv;charset=utf-8')
+  downloadFile(`FleasOfTheWorld_${exportSlug(selectionLabel.value)}_checklist_${date}.csv`, `\ufeff${csv}`, 'text/csv;charset=utf-8')
 }
 
 function checklistExportContent() {
@@ -912,7 +1170,7 @@ function checklistExportContent() {
 function downloadCountryText() {
   const { taxa, references } = checklistExportContent()
   const lines = [
-    `Fleas of the World: ${selectedCountry.value} checklist`,
+    `Fleas of the World: ${selectionLabel.value} checklist`,
     `Generated ${new Date().toISOString().slice(0, 10)}.`,
     `Recommended citation: ${recommendedCitation.value}`,
     `${taxa.length} species and subspecies with indexed records.`,
@@ -933,7 +1191,7 @@ function downloadCountryText() {
 
   lines.push('REFERENCES', '', ...references)
   const date = new Date().toISOString().slice(0, 10)
-  downloadFile(`FleasOfTheWorld_${exportSlug(selectedCountry.value)}_checklist_${date}.txt`, lines.join('\r\n'), 'text/plain;charset=utf-8')
+  downloadFile(`FleasOfTheWorld_${exportSlug(selectionLabel.value)}_checklist_${date}.txt`, lines.join('\r\n'), 'text/plain;charset=utf-8')
 }
 
 function escapeRtf(value) {
@@ -963,14 +1221,14 @@ function downloadCountryRtf() {
   const date = new Date().toISOString().slice(0, 10)
   const lines = [
     '{\\rtf1\\ansi\\deff0{\\fonttbl{\\f0\\fswiss\\fcharset0 Arial;}}\\viewkind4\\uc1',
-    `\\pard\\qc\\sa240\\fs32\\b ${escapeRtf(`Fleas of the World: ${selectedCountry.value} checklist`)}\\b0\\fs24\\par`,
-    `\\pard\\qc\\sa200\\fs20 Generated ${date}. ${taxa.length} species and subspecies with indexed records.\\fs24\\par`,
-    `\\pard\\qc\\sa120\\fs18 Recommended citation: ${escapeRtf(recommendedCitation.value)}\\fs20\\par`,
-    '\\pard\\sb240\\sa100\\b CHECKLIST\\b0\\par'
-  ]
+    `\\pard\\qc\\sa240\\fs32\\b ${escapeRtf(`Fleas of the World: ${selectionLabel.value} checklist`)}\\b0\\fs24\\par`,
+    `\\pard\\qc\\sa200\\fs20         Generated ${date}. ${taxa.length} species and subspecies with indexed records.\\fs24\\par`,
+        `\\pard\\qc\\sa120\\fs18 Recommended citation: ${escapeRtf(recommendedCitation.value)}\\fs20\\par`,
+        '\\pard\\sb240\\sa100\\b CHECKLIST\\b0\\par'
+      ]
 
-  for (const entry of taxa) {
-    const { taxon } = entry
+      for (const entry of taxa) {
+        const { taxon } = entry
     lines.push(`\\pard\\sa60\\i ${escapeRtf(taxon.name)}\\i0${taxon.authorship ? `\\~${escapeRtf(taxon.authorship)}` : ''}\\par`)
     for (const distribution of entry.distributions) {
       const citations = distribution.citations.length ? ` (${distribution.citations.join('; ')})` : ''
@@ -987,7 +1245,7 @@ function downloadCountryRtf() {
   lines.push('}')
 
   downloadFile(
-    `FleasOfTheWorld_${exportSlug(selectedCountry.value)}_checklist_${date}.rtf`,
+    `FleasOfTheWorld_${exportSlug(selectionLabel.value)}_checklist_${date}.rtf`,
     lines.join('\r\n'),
     'application/rtf'
   )
@@ -995,7 +1253,7 @@ function downloadCountryRtf() {
 
 const sourcesByTaxon = computed(() => {
   const groups = new Map()
-  for (const record of countryRows.value) {
+  for (const record of scopedRows.value) {
     if (!isSpeciesRecord(record)) continue
     const taxonKey = speciesKey(record)
     if (!groups.has(taxonKey)) groups.set(taxonKey, { references: new Map(), specimens: [] })
@@ -1056,7 +1314,7 @@ const sourcesByTaxon = computed(() => {
 
 const recordEvidenceByTaxon = computed(() => {
   const evidence = new Map()
-  for (const record of countryRows.value) {
+  for (const record of scopedRows.value) {
     if (!isSpeciesRecord(record)) continue
     const taxonKey = speciesKey(record)
     if (!evidence.has(taxonKey)) evidence.set(taxonKey, { citations: new Set(), specimens: new Set() })
@@ -1146,7 +1404,7 @@ async function loadDistributionPlaces(rows, requestId) {
 
 const topReferences = computed(() => {
   const references = new Map()
-  for (const record of countryRows.value) {
+  for (const record of scopedRows.value) {
     const isDistribution = record.dwc_occurrence_object_type === 'AssertedDistribution'
     const isSpecimen = record.dwc_occurrence_object_type === 'CollectionObject' || record.basisOfRecord === 'PreservedSpecimen'
     if (!isDistribution && !isSpecimen) continue
@@ -1235,5 +1493,16 @@ onBeforeUnmount(() => window.removeEventListener('hashchange', syncCountryFromHa
 watch(selectedCountry, () => {
   refreshMapStyles()
   focusMapOnCountry()
+  subdivisionLayer?.bringToFront()
+  raiseCountryOutline()
+  updateSubdivisionLayer()
 })
+
+watch(selectedRegion, () => {
+  refreshMapStyles()
+  restyleSubdivisions()
+  focusMapOnSelection()
+})
+
+watch(regionCounts, restyleSubdivisions)
 </script>
