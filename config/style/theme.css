@@ -13,11 +13,11 @@
   --tp-base-border: rgb(203, 213, 225);
   --tp-base-content: rgb(0, 0, 0);
 
-  --tp-map-georeference: rgb(239, 68, 68);
+  --tp-map-georeference: rgb(110, 20, 60);
   --tp-map-aggregate: rgb(3, 115, 22);
-  --tp-map-asserted: rgb(243, 182, 55);
-  --tp-map-type-material: rgb(51, 136, 255);
-  --tp-map-collection-object: rgb(239, 68, 68);
+  --tp-map-asserted: rgb(230, 159, 0);
+  --tp-map-type-material: rgb(0, 59, 230);
+  --tp-map-collection-object: rgb(110, 20, 60);
 
   --tp-scrollbar-thumb: rgb(156, 163, 175);
   --tp-scrollbar-track: rgb(229, 231, 235);

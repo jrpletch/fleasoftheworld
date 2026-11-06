@@ -10,6 +10,7 @@ import {
 } from '../utils'
 import { ASSERTED_ABSENT } from '@/constants/objectTypes'
 import { LEGEND } from '../constants'
+import { refineBoundaries } from '../utils/refineBoundaries.js'
 
 function normalizeAbsentFeatures(arr) {
   arr.forEach((feature) => {
@@ -101,7 +102,7 @@ export const useDistributionStore = defineStore('distributionStoreMapV2', {
             signal: this.controller.signal
           })
         )
-          .then(({ data }) => {
+          .then(async ({ data }) => {
             if (data.request_too_large) {
               this.distribution.geojson = null
               this.distribution.errorMessage = data.message
@@ -111,10 +112,11 @@ export const useDistributionStore = defineStore('distributionStoreMapV2', {
               const { features, shapeTypes } = removeDuplicateShapes(
                 sortFeaturesByType(data.features, Object.keys(LEGEND))
               )
+              const refined = await refineBoundaries(features)
 
               this.distribution.currentShapeTypes = shapeTypes
               this.distribution.geojson = {
-                features
+                features: refined
               }
             }
           })

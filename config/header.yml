@@ -15,6 +15,8 @@
           link: /checklists
         - label: Search DwC
           link: /resources/tw/filter/dwc_otus
+        - label: Siphonapterists
+          link: /siphonapterists
 
     - label: Guides
       submenu:

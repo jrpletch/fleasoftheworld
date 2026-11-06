@@ -1,30 +1,117 @@
 <template>
   <main class="min-h-screen bg-base-background text-base-content">
     <header class="border-b border-base-border/40 bg-base-foreground">
-      <div class="container mx-auto box-border px-4 py-8 sm:py-10">
-        <p class="text-sm font-semibold uppercase text-primary-color dark:text-secondary-color">
-          Checklists
-        </p>
-        <h1 class="mt-2 text-3xl font-bold sm:text-4xl">
+      <div class="container mx-auto box-border flex flex-wrap items-baseline gap-x-4 gap-y-1 px-4 py-3">
+        <h1 class="text-2xl font-bold">
           Country checklists
         </h1>
-        <p class="mt-3 max-w-3xl text-base leading-relaxed text-base-content/70">
-          Browse flea species reported in each country. Counts represent distinct species in the occurrence records.
+        <p class="text-sm text-base-content/70">
+          Flea species reported in each country. Counts are distinct species in the occurrence records.
         </p>
       </div>
     </header>
 
-    <section class="container mx-auto box-border grid min-w-0 gap-6 px-4 py-6 xl:grid-cols-[minmax(0,1.45fr)_minmax(21rem,0.85fr)]">
+    <div class="container mx-auto box-border min-w-0 px-4 pt-4">
+      <div class="flex flex-wrap items-end gap-3">
+        <div class="min-w-[14rem] flex-1 sm:max-w-sm">
+          <label class="block text-sm font-semibold" for="distribution-country">
+            Country or area
+          </label>
+          <select
+            id="distribution-country"
+            class="mt-1 box-border block w-full min-w-0 max-w-full rounded-md border border-base-border bg-base-foreground px-3 py-2 font-normal focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            :value="selectedCountryOption"
+            @change="selectCountry($event.target.value)"
+          >
+            <option value="">Select a country</option>
+            <option
+              v-for="country in countries"
+              :key="country.key"
+              :value="country.name"
+            >
+              {{ countryDisplayName(country.name) }} ({{ country.count }})
+            </option>
+          </select>
+        </div>
+
+        <div v-if="subdivisionOptions.length" class="min-w-[14rem] flex-1 sm:max-w-sm">
+          <label class="block text-sm font-semibold" for="distribution-region">
+            {{ regionLabel }}
+          </label>
+          <select
+            id="distribution-region"
+            class="mt-1 box-border block w-full min-w-0 max-w-full rounded-md border border-base-border bg-base-foreground px-3 py-2 font-normal focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            :value="selectedSubdivision"
+            @change="selectRegion($event.target.value)"
+          >
+            <option value="">
+              {{ isAssociatedAreaSelection ? `Choose a ${regionLabel.toLocaleLowerCase()}` : `All of ${countryDisplayName(selectedCountry)}` }}
+            </option>
+            <option
+              v-for="region in subdivisionOptions"
+              :key="region.key"
+              :value="region.name"
+            >
+              {{ countryDisplayName(region.name) }}<template v-if="region.count !== null"> ({{ region.count }})</template>
+            </option>
+          </select>
+        </div>
+
+        <div v-if="associatedAreaOptions.length" class="min-w-[14rem] flex-1 sm:max-w-sm">
+          <label class="block text-sm font-semibold" for="distribution-associated-area">
+            Territory or associated area
+          </label>
+          <select
+            id="distribution-associated-area"
+            class="mt-1 box-border block w-full min-w-0 max-w-full rounded-md border border-base-border bg-base-foreground px-3 py-2 font-normal focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+            :value="selectedAssociatedArea"
+            @change="selectRegion($event.target.value)"
+          >
+            <option value="">
+              {{ selectedRegion && !isAssociatedAreaSelection ? 'Choose a territory or associated area' : 'No territory or associated area selected' }}
+            </option>
+            <option
+              v-for="area in associatedAreaOptions"
+              :key="area.key"
+              :value="area.name"
+            >
+              {{ countryDisplayName(area.name) }} ({{ area.count }})
+            </option>
+          </select>
+        </div>
+
+        <p
+          v-if="countsLoading"
+          class="pb-2 text-xs text-base-content/60"
+          role="status"
+        >
+          Loading country species counts…
+        </p>
+        <p
+          v-else-if="countsError"
+          class="pb-2 text-sm text-red-700"
+          role="alert"
+        >
+          {{ countsError }}
+          <button
+            class="ml-1 font-semibold underline"
+            type="button"
+            @click="loadCountryCounts"
+          >Retry</button>
+        </p>
+      </div>
+    </div>
+
+    <section class="container mx-auto box-border grid min-w-0 gap-4 px-4 py-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(21rem,0.85fr)]">
       <section aria-label="Flea species world map" class="min-w-0">
         <div class="relative overflow-hidden rounded-lg bg-base-foreground ring-1 ring-base-border/50">
           <ClientOnly>
-            <VMap
+            <ChecklistMap
               ref="countryMapRef"
               v-if="countryGeoJson"
-              class="country-checklist-map h-[28rem] max-h-[28rem] sm:h-[36rem] sm:max-h-[36rem]"
+              class="country-checklist-map h-[26rem] max-h-[26rem] sm:h-[30rem] sm:max-h-[30rem] xl:h-[max(24rem,calc(100vh-17rem))] xl:max-h-none"
               dragging
               :zoom="2"
-              :zoom-bounds="8"
               :center="[15, 0]"
               :geojson="countryGeoJson"
               :geojson-options="geojsonOptions"
@@ -42,6 +129,22 @@
           >
             {{ mapError }}
           </p>
+        </div>
+
+        <div class="mt-3 flex flex-wrap gap-2" role="group" aria-label="Map view">
+          <button
+            class="rounded-md border border-base-border bg-base-foreground px-3 py-2 text-sm font-medium hover:bg-base-muted/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
+            type="button"
+            :disabled="!mapReady"
+            @click="showWorldView"
+          >World view</button>
+          <button
+            class="rounded-md border border-base-border bg-base-foreground px-3 py-2 text-sm font-medium hover:bg-base-muted/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary disabled:cursor-not-allowed disabled:opacity-50"
+            type="button"
+            :disabled="!mapReady || !selectedCountry"
+            :title="selectedCountry ? `Return to ${selectionLabel}` : 'Select a country or area first'"
+            @click="syncMapSelection"
+          >Return to selection</button>
         </div>
 
         <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-base-content/70">
@@ -72,81 +175,21 @@
       </section>
 
       <aside class="min-w-0">
-        <label class="block text-sm font-semibold" for="distribution-country">
-          Country
-        </label>
-        <select
-          id="distribution-country"
-          class="mt-1.5 box-border block w-full min-w-0 max-w-full rounded-md border border-base-border bg-base-foreground px-3 py-2.5 font-normal focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-          :value="selectedCountry"
-          @change="selectCountry($event.target.value)"
-        >
-          <option value="">Select a country</option>
-          <option
-            v-for="country in countries"
-            :key="country.key"
-            :value="country.name"
-          >
-            {{ country.name }} ({{ country.count }})
-          </option>
-        </select>
-
-        <template v-if="regionOptions.length">
-          <label class="mt-3 block text-sm font-semibold" for="distribution-region">
-            {{ regionLabel }}
-          </label>
-          <select
-            id="distribution-region"
-            class="mt-1.5 box-border block w-full min-w-0 max-w-full rounded-md border border-base-border bg-base-foreground px-3 py-2.5 font-normal focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
-            :value="selectedRegion"
-            @change="selectRegion($event.target.value)"
-          >
-            <option value="">All of {{ selectedCountry }}</option>
-            <option
-              v-for="region in regionOptions"
-              :key="region.name"
-              :value="region.name"
-            >
-              {{ region.name }} ({{ region.count }})
-            </option>
-          </select>
-        </template>
-
-        <p
-          v-if="countsLoading"
-          class="mt-2 text-xs text-base-content/60"
-          role="status"
-        >
-          Loading country species counts…
-        </p>
-        <p
-          v-else-if="countsError"
-          class="mt-2 text-sm text-red-700"
-          role="alert"
-        >
-          {{ countsError }}
-          <button
-            class="ml-1 font-semibold underline"
-            type="button"
-            @click="loadCountryCounts"
-          >Retry</button>
-        </p>
-
         <div
           v-if="selectedCountry"
-          class="mt-5 border-t border-base-border/50 pt-4"
+          class="border-t border-base-border/50 pt-3 xl:border-t-0 xl:pt-0"
         >
           <div class="flex flex-wrap items-center justify-between gap-3">
             <div class="flex min-w-0 items-baseline gap-3">
               <h2 class="flex items-center gap-2 text-xl font-semibold">
                 <img
-                  v-if="countryCode(selectedCountry)"
+                  v-if="countryCode(mapSelectionName)"
                   class="h-4 w-6 shrink-0 rounded-sm object-cover"
-                  :src="`https://flagcdn.com/w40/${countryCode(selectedCountry)}.png`"
+                  :src="`https://flagcdn.com/w40/${countryCode(mapSelectionName)}.png`"
                   alt=""
                   aria-hidden="true"
                 />
-                <span>{{ selectedRegion ? `${selectedRegion}, ${selectedCountry}` : selectedCountry }}</span>
+                <span>{{ pageTitle }}</span>
               </h2>
               <span class="shrink-0 text-sm tabular-nums text-base-content/65">
                 {{ displayedSpeciesCount }} species
@@ -157,7 +200,7 @@
               class="text-xs font-medium text-primary-color hover:underline dark:text-secondary-color"
               type="button"
               @click="selectRegion('')"
-            >← All of {{ selectedCountry }}</button>
+            >← All of {{ countryDisplayName(selectedCountry) }}</button>
             <div
               v-if="!countryLoading && !countryError && species.length"
               class="flex flex-wrap items-center gap-2"
@@ -246,9 +289,17 @@
                   <p class="mt-2 text-xs text-base-content/55">
                     {{ filteredSpecies.length }} of {{ species.length }} listed taxa
                   </p>
-                  <ul class="mt-2 divide-y divide-base-border/50 border-y border-base-border/50">
+                  <ul class="mt-2 max-h-[28rem] divide-y divide-base-border/50 overflow-y-auto border-y border-base-border/50 xl:max-h-[calc(100vh-27rem)] xl:min-h-[12rem]">
+                    <template
+                      v-for="group in filteredSpeciesGroups"
+                      :key="group.family"
+                    >
+                    <li class="sticky top-0 z-10 bg-base-muted px-2 py-1.5 text-xs font-semibold uppercase tracking-wide text-base-content/75">
+                      {{ group.family }}
+                      <span class="ml-1 font-normal normal-case text-base-content/55">({{ group.taxa.length }})</span>
+                    </li>
                     <li
-                      v-for="taxon in filteredSpecies"
+                      v-for="taxon in group.taxa"
                       :key="taxon.key"
                       class="py-2.5 pr-2 text-sm"
                     >
@@ -325,10 +376,11 @@
                         <p v-else>No citation or specimen details are available for these records.</p>
                       </div>
                     </li>
+                    </template>
                   </ul>
                 </template>
                 <p v-else class="text-sm text-base-content/65">
-                  No flea species occurrence records are                   currently indexed for {{ selectionLabel }}.
+                  No flea species occurrence records are currently indexed for {{ selectionLabel }}.
                 </p>
               </section>
 
@@ -345,7 +397,7 @@
                 >
                   Top cited references, ranked by distinct taxa.
                 </p>
-                <ol v-if="topReferences.length" class="mt-2 space-y-3">
+                <ol v-if="topReferences.length" class="mt-2 max-h-[28rem] space-y-3 overflow-y-auto pr-2 xl:max-h-[calc(100vh-27rem)] xl:min-h-[12rem]">
                   <li
                     v-for="reference in topReferences"
                     :key="reference.full"
@@ -420,6 +472,8 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { makeAPIRequest } from '@/utils/request'
 import { buildSubdivisionIndex, resolveSubdivision } from './data/subdivisions.js'
+import { prepareCountryMapData, prepareSubdivisionMapData, wrappedCountryBounds } from './data/mapWrapping.js'
+import ChecklistMap from './components/ChecklistMap.vue'
 
 const {
   base_url = '/',
@@ -442,6 +496,7 @@ const legend = [
 
 const countryGeoJson = ref(null)
 const countryMapRef = ref(null)
+const mapReady = ref(false)
 const mapLayers = new Map()
 const countriesByKey = ref(new Map())
 const countryCounts = ref(new Map())
@@ -452,15 +507,17 @@ const selectedCountry = ref('')
 const selectedRegion = ref('')
 const subdivisionGeoJson = ref(null)
 let subdivisionLayer = null
+let subdivisionLayerCountryKey = ''
 const subdivisionsShown = ref(false)
 let subdivisionLayerRequestId = 0
+let mapSelectionRequestId = 0
 let loadedCountry = null
 const REGION_LABELS = {
   'united states': 'State',
   canada: 'Province or territory',
   australia: 'State or territory',
-  china: 'Province',
-  russia: 'Region',
+  china: 'Province or region',
+  russia: 'Administrative area',
   'united kingdom': 'Constituent country'
 }
 const countryLoading = ref(false)
@@ -483,6 +540,15 @@ const countryAliases = {
   'faeroe is.': 'faroe islands',
   macedonia: 'north macedonia',
   'french southern territories': 'french southern and antarctic lands',
+  'réunion': 'reunion',
+  'saint barthélemy': 'saint barthelemy',
+  'åland islands': 'aland',
+  'timor-leste': 'east timor',
+  'vatican city': 'vatican',
+  curacao: 'curaçao',
+  'hong kong sar': 'hong kong s.a.r.',
+  'macao sar': 'macao s.a.r',
+  'macao s.a.r.': 'macao s.a.r',
   swaziland: 'eswatini',
   korea: 'south korea',
   'dem. rep. korea': 'north korea',
@@ -518,6 +584,95 @@ function countryKey(name) {
   const normalized = String(name || '').trim().toLocaleLowerCase().replace(/\s+/g, ' ')
   return countryAliases[normalized] || normalized
 }
+
+const COUNTRY_DISPLAY_NAMES = {
+  'united states': 'United States',
+  tanzania: 'Tanzania',
+  'republic of serbia': 'Serbia',
+  reunion: 'Réunion',
+  'saint barthelemy': 'Saint Barthélemy',
+  aland: 'Åland Islands',
+  'south georgia and the islands': 'South Georgia and the South Sandwich Islands',
+  'hong kong s.a.r.': 'Hong Kong',
+  'macao s.a.r': 'Macao',
+  vatican: 'Vatican City',
+  'east timor': 'Timor-Leste',
+  eswatini: 'Eswatini'
+}
+
+function countryDisplayName(name) {
+  return COUNTRY_DISPLAY_NAMES[countryKey(name)] || name
+}
+
+const ASSOCIATED_AREAS_BY_SOVEREIGN = {
+  'united states': {
+    country: 'United States of America',
+    areas: [
+      'American Samoa', 'Guam', 'Northern Mariana Islands', 'Puerto Rico',
+      'United States Minor Outlying Islands', 'United States Virgin Islands'
+    ]
+  },
+  'united kingdom': {
+    country: 'United Kingdom',
+    areas: [
+      'Anguilla', 'Bermuda', 'British Indian Ocean Territory', 'British Virgin Islands',
+      'Cayman Islands', 'Falkland Islands', 'Gibraltar', 'Guernsey', 'Isle of Man',
+      'Jersey', 'Montserrat', 'Pitcairn Islands', 'Saint Helena',
+      'South Georgia and the Islands', 'Turks and Caicos Islands'
+    ]
+  },
+  france: {
+    country: 'France',
+    areas: [
+      'Clipperton Island', 'French Guiana', 'French Polynesia', 'French Southern and Antarctic Lands',
+      'Guadeloupe', 'Martinique', 'Mayotte', 'New Caledonia', 'Reunion',
+      'Saint Barthelemy', 'Saint Martin', 'Saint Pierre and Miquelon', 'Wallis and Futuna'
+    ]
+  },
+  netherlands: {
+    country: 'Netherlands',
+    areas: ['Aruba', 'Bonaire', 'Curaçao', 'Saba', 'Sint Eustatius', 'Sint Maarten']
+  },
+  denmark: {
+    country: 'Denmark',
+    areas: ['Faroe Islands', 'Greenland']
+  },
+  australia: {
+    country: 'Australia',
+    areas: [
+      'Ashmore and Cartier Islands', 'Coral Sea Islands', 'Heard Island and McDonald Islands',
+      'Indian Ocean Territories', 'Norfolk Island'
+    ]
+  },
+  'new zealand': {
+    country: 'New Zealand',
+    areas: ['Cook Islands', 'Niue']
+  },
+  china: {
+    country: 'China',
+    areas: ['Hong Kong S.A.R.', 'Macao S.A.R']
+  },
+  norway: {
+    country: 'Norway',
+    areas: ['Bouvet Island', 'Svalbard and Jan Mayen']
+  },
+  finland: {
+    country: 'Finland',
+    areas: ['Aland']
+  }
+}
+
+// Disputed or uninhabited features shown for context only.
+const NON_SELECTABLE_AREAS = new Set([
+  'siachen glacier', 'bir tawil', 'spratly islands', 'scarborough reef', 'bajo nuevo bank (petrel is.)',
+  'serranilla bank', 'brazilian island', 'southern patagonian ice field'
+])
+
+const ASSOCIATED_AREA_PARENT_BY_KEY = new Map(
+  Object.entries(ASSOCIATED_AREAS_BY_SOVEREIGN).flatMap(([sovereignKey, group]) => (
+    group.areas.map((area) => [countryKey(area), sovereignKey])
+  ))
+)
 
 function countryCode(name) {
   const feature = countryGeoJson.value?.features.find(
@@ -563,7 +718,7 @@ async function loadCountryShapes() {
     const response = await fetch(`${base_url}data/countries.geojson`, { cache: 'no-cache' })
     if (!response.ok) throw new Error('Could not load country boundaries.')
     const data = await response.json()
-    countryGeoJson.value = data
+    countryGeoJson.value = prepareCountryMapData(data)
   } catch {
     mapError.value = 'The world map could not be loaded. Use the country list to browse records.'
   }
@@ -648,8 +803,48 @@ const countries = computed(() => {
       count: selectedCountryCount.value
     })
   }
-  return [...options.values()].sort((a, b) => a.name.localeCompare(b.name))
+  return [...options.values()].sort((a, b) => (
+    countryDisplayName(a.name).localeCompare(countryDisplayName(b.name))
+  ))
 })
+
+const selectedCountryOption = computed(() => (
+  countries.value.find((country) => country.key === countryKey(selectedCountry.value))?.name || ''
+))
+
+const associatedAreaParent = computed(() => selectedCountry.value)
+
+const associatedAreaOptions = computed(() => {
+  const parentKey = countryKey(associatedAreaParent.value)
+  const group = ASSOCIATED_AREAS_BY_SOVEREIGN[parentKey]
+  if (!group) return []
+  return group.areas
+    .map((name) => {
+      const feature = countryGeoJson.value?.features.find(
+        (item) => countryKey(item.properties?.name) === countryKey(name)
+      )
+      if (!feature?.properties?.name) return null
+      const areaName = feature.properties.name
+      const key = countryKey(areaName)
+      return { key, name: areaName, count: countryCounts.value.get(key) || 0 }
+    })
+    .filter(Boolean)
+    .sort((a, b) => countryDisplayName(a.name).localeCompare(countryDisplayName(b.name)))
+})
+
+const isAssociatedAreaSelection = computed(() => (
+  ASSOCIATED_AREA_PARENT_BY_KEY.get(countryKey(selectedRegion.value)) === countryKey(selectedCountry.value)
+))
+
+const selectedAssociatedArea = computed(() => (
+  isAssociatedAreaSelection.value
+    ? associatedAreaOptions.value.find((area) => area.key === countryKey(selectedRegion.value))?.name || ''
+    : ''
+))
+
+const mapSelectionName = computed(() => (
+  isAssociatedAreaSelection.value ? selectedRegion.value : selectedCountry.value
+))
 
 const selectedCountryCount = computed(() => countryCounts.value.get(countryKey(selectedCountry.value)) || 0)
 
@@ -659,10 +854,13 @@ function colorForCount(count) {
 
 function countryStyle(feature) {
   const name = feature.properties?.name || ''
+  if (NON_SELECTABLE_AREAS.has(countryKey(name))) {
+    return { fill: true, fillColor: '#cfd4d9', fillOpacity: 0.35, color: '#ffffff', weight: 0.6, opacity: 1, interactive: false }
+  }
   const count = countryCounts.value.get(countryKey(name)) || 0
-  const selected = countryKey(name) === countryKey(selectedCountry.value)
+  const selected = countryKey(name) === countryKey(mapSelectionName.value)
   if (selected && subdivisionsShown.value) {
-    if (selectedRegion.value) return { weight: 0, opacity: 0, fill: false }
+    if (selectedRegion.value && !isAssociatedAreaSelection.value) return { weight: 0, opacity: 0, fill: false }
     return { color: '#f3b637', weight: 3.5, opacity: 1, fill: false }
   }
   return {
@@ -682,7 +880,9 @@ function refreshMapStyles() {
     const element = layer.getElement?.()
     if (element) {
       // Only the selected country's outline ignores clicks, and only while its subdivisions are shown.
-      element.style.pointerEvents = subdivisionsShown.value && countryKey(name) === selectedKey ? 'none' : ''
+      element.style.pointerEvents = subdivisionsShown.value
+        && !isAssociatedAreaSelection.value
+        && countryKey(name) === selectedKey ? 'none' : ''
     }
   }
 }
@@ -716,46 +916,73 @@ function mainlandBounds(geometry) {
 
 // Canada's mainland extent would otherwise include the Arctic archipelago.
 const COUNTRY_VIEW_OVERRIDES = {
-  canada: [[41.5, -141.5], [70, -52]]
+  canada: [[41.5, -141.5], [70, -52]],
+  // Trims the Arctic islands and far-eastern Chukotka so the mainland fills the map.
+  russia: [[43, 28], [76, 170]]
+}
+
+function focusMapBounds(map, bounds, maxZoom) {
+  const options = { padding: [24, 24], maxZoom }
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+    map.fitBounds(bounds, { ...options, animate: false })
+    return
+  }
+  map.flyToBounds(bounds, { ...options, duration: 0.55 })
 }
 
 function focusMapOnCountry() {
   const map = countryMapRef.value?.getMapObject()
   if (!map) return
   if (!selectedCountry.value) {
-    map.fitWorld({ padding: [20, 20] })
+    const zoom = countryMapRef.value?.getWorldZoom?.() ?? 2
+    map.setView([15, 0], zoom, { animate: false })
     return
   }
 
+  const targetName = mapSelectionName.value
   const layer = [...mapLayers.entries()]
-    .find(([name]) => countryKey(name) === countryKey(selectedCountry.value))?.[1]
-  const bounds = COUNTRY_VIEW_OVERRIDES[countryKey(selectedCountry.value)]
-    || mainlandBounds(layer?.feature?.geometry) || layer?.getBounds?.()
+    .find(([name]) => countryKey(name) === countryKey(targetName))?.[1]
+  const focusGeometry = layer?.feature?.checklistFocusGeometry || layer?.feature?.geometry
+  const defaultBounds = COUNTRY_VIEW_OVERRIDES[countryKey(targetName)]
+    || mainlandBounds(focusGeometry) || layer?.getBounds?.()
+  const bounds = wrappedCountryBounds(layer?.feature, map.getCenter().lng, defaultBounds) || defaultBounds
   if (bounds && (Array.isArray(bounds) || bounds.isValid())) {
     layer.bringToFront()
-    map.fitBounds(bounds, { padding: [24, 24], maxZoom: 5 })
+    focusMapBounds(map, bounds, 8)
   }
 }
 
 function onCountryMapReady() {
-  focusMapOnCountry()
-  updateSubdivisionLayer()
+  mapReady.value = true
+  syncMapSelection()
+}
+
+function countryTooltip(name) {
+  const label = countryDisplayName(name)
+  if (countsLoading.value) return `${label}: Loading species counts…`
+  if (countsError.value) return `${label}: Counts unavailable`
+  return `${label}: ${countryCounts.value.get(countryKey(name)) || 0} reported species`
+}
+
+function refreshCountryTooltips() {
+  for (const layer of mapLayers.values()) {
+    if (layer.isTooltipOpen()) layer.getTooltip().update()
+  }
 }
 
 const geojsonOptions = () => ({
   style: countryStyle,
   onEachFeature: (feature, layer) => {
     const name = feature.properties?.name
-    if (!name) return
+    if (!name || NON_SELECTABLE_AREAS.has(countryKey(name))) return
     mapLayers.set(name, layer)
-    const count = countryCounts.value.get(countryKey(name)) || 0
-    layer.bindTooltip(`${name}: ${count} reported species`, { sticky: true })
+    layer.bindTooltip(() => countryTooltip(name), { sticky: true })
     layer.on('click', () => {
       const option = countries.value.find((country) => country.key === countryKey(name))
       selectCountry(option?.name || name)
     })
     layer.on('mouseover', (event) => event.target.setStyle({
-      weight: countryKey(name) === countryKey(selectedCountry.value) ? 3.5 : 1.5,
+      weight: countryKey(name) === countryKey(mapSelectionName.value) ? 3.5 : 1.5,
       fillOpacity: 1
     }))
     layer.on('mouseout', () => layer.setStyle(countryStyle(feature)))
@@ -763,6 +990,11 @@ const geojsonOptions = () => ({
 })
 
 function selectCountry(name, region = '') {
+  const areaParentKey = ASSOCIATED_AREA_PARENT_BY_KEY.get(countryKey(name))
+  if (areaParentKey && !region) {
+    region = name
+    name = ASSOCIATED_AREAS_BY_SOVEREIGN[areaParentKey].country
+  }
   const params = new URLSearchParams()
   if (name) params.set('country', name)
   if (name && region) params.set('region', region)
@@ -779,8 +1011,15 @@ function syncCountryFromHash() {
   const [path, query = ''] = window.location.hash.slice(1).split('?')
   if (path !== '/checklists') return
   const params = new URLSearchParams(query)
-  const country = params.get('country') || ''
-  selectedRegion.value = country ? params.get('region') || '' : ''
+  let country = params.get('country') || ''
+  let region = country ? params.get('region') || '' : ''
+  const areaParentKey = ASSOCIATED_AREA_PARENT_BY_KEY.get(countryKey(country))
+  if (areaParentKey) {
+    region = country
+    country = ASSOCIATED_AREAS_BY_SOVEREIGN[areaParentKey].country
+  }
+  selectedCountry.value = country
+  selectedRegion.value = region
   speciesFilter.value = ''
   expandedTaxonKey.value = ''
   expandedReferenceKey.value = ''
@@ -790,10 +1029,10 @@ function syncCountryFromHash() {
     month: 'long',
     year: 'numeric'
   })
-  if (country !== loadedCountry) {
-    loadedCountry = country
-    selectedCountry.value = country
-    loadCountry(country)
+  const activeCountry = isAssociatedAreaSelection.value ? selectedRegion.value : country
+  if (activeCountry !== loadedCountry) {
+    loadedCountry = activeCountry
+    loadCountry(activeCountry)
   }
   if (pendingCountryScrollY !== null) {
     const scrollY = pendingCountryScrollY
@@ -802,9 +1041,13 @@ function syncCountryFromHash() {
   }
 }
 
-const selectionLabel = computed(() => (
-  selectedRegion.value ? `${selectedRegion.value}, ${selectedCountry.value}` : selectedCountry.value
-))
+const selectionLabel = computed(() => {
+  const country = countryDisplayName(selectedCountry.value)
+  if (isAssociatedAreaSelection.value) return countryDisplayName(selectedRegion.value)
+  return selectedRegion.value ? `${countryDisplayName(selectedRegion.value)}, ${country}` : country
+})
+
+const pageTitle = computed(() => selectionLabel.value)
 
 const recommendedCitation = computed(() => {
   if (!selectedCountry.value || !checklistCitationUrl.value || !citationAccessDate.value) return ''
@@ -831,9 +1074,11 @@ function recordRegion(record) {
 }
 
 const scopedRows = computed(() => (
-  selectedRegion.value
-    ? countryRows.value.filter((record) => recordRegion(record) === selectedRegion.value)
-    : countryRows.value
+  isAssociatedAreaSelection.value
+    ? countryRows.value
+    : selectedRegion.value
+      ? countryRows.value.filter((record) => recordRegion(record) === selectedRegion.value)
+      : countryRows.value
 ))
 
 const regionCounts = computed(() => {
@@ -848,13 +1093,23 @@ const regionCounts = computed(() => {
   return new Map([...speciesByRegion.entries()].map(([region, set]) => [region, set.size]))
 })
 
-const regionOptions = computed(() => countrySubdivisions.value
-  .map((feature) => ({ name: feature.properties.name, count: regionCounts.value.get(feature.properties.name) || 0 }))
-  .filter((region) => region.count || region.name === selectedRegion.value)
-  .sort((a, b) => a.name.localeCompare(b.name)))
+const subdivisionOptions = computed(() => countrySubdivisions.value
+  .map((feature) => ({
+    key: `subdivision-${feature.properties.name}`,
+    name: feature.properties.name,
+    count: isAssociatedAreaSelection.value ? null : regionCounts.value.get(feature.properties.name) || 0
+  }))
+  .filter((region) => isAssociatedAreaSelection.value || region.count || region.name === selectedRegion.value))
+
+const selectedSubdivision = computed(() => (
+  !isAssociatedAreaSelection.value
+    ? subdivisionOptions.value.find((region) => region.name === selectedRegion.value)?.name || ''
+    : ''
+))
 
 const displayedSpeciesCount = computed(() => {
   if (!selectedRegion.value) return selectedCountryCount.value
+  if (isAssociatedAreaSelection.value) return countryCounts.value.get(countryKey(selectedRegion.value)) || 0
   return regionCounts.value.get(selectedRegion.value) || 0
 })
 
@@ -863,7 +1118,7 @@ async function loadSubdivisions() {
   try {
     const response = await fetch(`${base_url}data/subdivisions.geojson`)
     if (!response.ok) throw new Error('Could not load subdivision boundaries.')
-    subdivisionGeoJson.value = await response.json()
+    subdivisionGeoJson.value = prepareSubdivisionMapData(await response.json())
   } catch {
     mapError.value = 'State and province boundaries could not be loaded.'
   }
@@ -883,18 +1138,23 @@ function subdivisionStyle(feature) {
 
 async function updateSubdivisionLayer() {
   const requestId = ++subdivisionLayerRequestId
-  subdivisionsShown.value = false
-  refreshMapStyles()
-  if (!REGION_LABELS[countryKey(selectedCountry.value)]) {
-    subdivisionLayer?.remove()
-    subdivisionLayer = null
+  const country = countryKey(selectedCountry.value)
+  if (subdivisionLayer && subdivisionLayerCountryKey === country && !isAssociatedAreaSelection.value) {
+    subdivisionsShown.value = true
     return
   }
-  await loadSubdivisions()
-  const map = countryMapRef.value?.getMapObject?.()
-  if (!map) return
+
+  subdivisionsShown.value = false
   subdivisionLayer?.remove()
   subdivisionLayer = null
+  subdivisionLayerCountryKey = ''
+  if (!REGION_LABELS[country]) return
+
+  await loadSubdivisions()
+  if (requestId !== subdivisionLayerRequestId) return
+  if (isAssociatedAreaSelection.value) return
+  const map = countryMapRef.value?.getMapObject?.()
+  if (!map) return
   const { default: L } = await import('leaflet')
   if (requestId !== subdivisionLayerRequestId || !countrySubdivisions.value.length) return
 
@@ -917,10 +1177,37 @@ async function updateSubdivisionLayer() {
       }
     }
   ).addTo(map)
+  subdivisionLayerCountryKey = country
   subdivisionsShown.value = true
+}
+
+async function updateMapView(view) {
+  const requestId = ++mapSelectionRequestId
+  const map = countryMapRef.value?.getMapObject?.()
+  if (!map) return
+  map.stop()
+  await updateSubdivisionLayer()
+  if (requestId !== mapSelectionRequestId) return
   refreshMapStyles()
-  focusMapOnSelection()
-  raiseCountryOutline()
+  restyleSubdivisions()
+  if (view === 'world') {
+    const zoom = countryMapRef.value?.getWorldZoom?.() ?? 2
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      map.setView([15, 0], zoom, { animate: false })
+    } else {
+      map.flyTo([15, 0], zoom, { duration: 0.55 })
+    }
+  } else {
+    focusMapOnSelection()
+  }
+}
+
+function syncMapSelection() {
+  return updateMapView('selection')
+}
+
+function showWorldView() {
+  return updateMapView('world')
 }
 
 // Keep the gold country outline above the subdivisions without intercepting their clicks.
@@ -931,7 +1218,7 @@ function raiseCountryOutline() {
   if (!layer) return
   layer.bringToFront()
   const element = layer.getElement?.()
-  if (element) element.style.pointerEvents = 'none'
+  if (element) element.style.pointerEvents = isAssociatedAreaSelection.value ? '' : 'none'
 }
 
 function restyleSubdivisions() {
@@ -939,14 +1226,16 @@ function restyleSubdivisions() {
 }
 
 function focusMapOnSelection() {
-  if (selectedRegion.value && subdivisionLayer) {
+  if (selectedRegion.value && !isAssociatedAreaSelection.value && subdivisionLayer) {
     const map = countryMapRef.value?.getMapObject?.()
     const layer = subdivisionLayer.getLayers().find((item) => item.feature.properties.name === selectedRegion.value)
-    const bounds = mainlandBounds(layer?.feature?.geometry) || layer?.getBounds?.()
+    const focusGeometry = layer?.feature?.checklistFocusGeometry || layer?.feature?.geometry
+    const defaultBounds = mainlandBounds(focusGeometry) || layer?.getBounds?.()
+    const bounds = wrappedCountryBounds(layer?.feature, map.getCenter().lng, defaultBounds) || defaultBounds
     if (map && bounds && (Array.isArray(bounds) || bounds.isValid())) {
       subdivisionLayer.bringToFront()
       layer.bringToFront()
-      map.fitBounds(bounds, { padding: [24, 24], maxZoom: 6 })
+      focusMapBounds(map, bounds, 6)
       raiseCountryOutline()
       return
     }
@@ -976,17 +1265,33 @@ const species = computed(() => {
         name: bareName(record),
         authorship: String(record.scientificNameAuthorship || '').trim(),
         rank: String(record.taxonRank || '').trim(),
+        family: String(record.family || '').trim(),
         otuId: Number(record.otu_id) || null
       })
     }
   }
-  return [...byTaxon.values()].sort((a, b) => a.name.localeCompare(b.name))
+  // Grouped by family (unplaced taxa last), alphabetical within each family.
+  return [...byTaxon.values()].sort((a, b) => (
+    (a.family ? 0 : 1) - (b.family ? 0 : 1)
+    || a.family.localeCompare(b.family)
+    || a.name.localeCompare(b.name)
+  ))
 })
 
 const filteredSpecies = computed(() => {
   const query = speciesFilter.value.trim().toLocaleLowerCase()
   if (!query) return species.value
   return species.value.filter((taxon) => `${taxon.name} ${taxon.authorship}`.toLocaleLowerCase().includes(query))
+})
+
+const filteredSpeciesGroups = computed(() => {
+  const groups = []
+  for (const taxon of filteredSpecies.value) {
+    const label = taxon.family || 'Family not recorded'
+    if (groups.at(-1)?.family !== label) groups.push({ family: label, taxa: [] })
+    groups.at(-1).taxa.push(taxon)
+  }
+  return groups
 })
 
 
@@ -1033,7 +1338,7 @@ function compactCitation(citationBody, fullReference) {
 }
 
 function distributionPlace(record) {
-  const country = String(record.country || selectedCountry.value).trim()
+  const country = String(record.country || mapSelectionName.value).trim()
   const assertedDistributionId = String(record.dwc_occurrence_object_id || '')
   const shapeName = plainText(distributionPlacesByOccurrence.value.get(assertedDistributionId) || '')
   if (shapeName && countryKey(shapeName) !== countryKey(country)) return shapeName
@@ -1047,7 +1352,7 @@ function distributionPlace(record) {
 }
 
 function specimenSourceLabel(record) {
-  const selectedCountryKey = countryKey(selectedCountry.value)
+  const selectedCountryKey = countryKey(mapSelectionName.value)
   const locality = [record.verbatimLocality, record.county, record.stateProvince, record.country]
     .map((value) => plainText(value))
     .filter((value) => value && countryKey(value) !== selectedCountryKey)
@@ -1089,10 +1394,11 @@ function countryExportRows() {
     const citationRows = isDistribution && citations.length ? citations : [{ short: '', full: '' }]
     for (const citation of citationRows) {
       rows.push({
+        family: String(record.family || '').trim(),
         scientificName: bareName(record),
         scientificNameAuthorship: String(record.scientificNameAuthorship || '').trim(),
         taxonRank: record.taxonRank || '',
-        country: record.country || selectedCountry.value,
+        country: record.country || mapSelectionName.value,
         stateProvince: record.stateProvince || '',
         county: record.county || '',
         municipality: record.municipality || '',
@@ -1135,7 +1441,7 @@ function exportSlug(value) {
 
 function downloadCountryCSV() {
   const columns = [
-    'scientificName', 'scientificNameAuthorship', 'taxonRank', 'country', 'stateProvince',
+    'family', 'scientificName', 'scientificNameAuthorship', 'taxonRank', 'country', 'stateProvince',
     'county', 'municipality', 'verbatimLocality', 'evidenceType', 'institutionCode',
     'catalogNumber', 'recordedBy', 'eventDate', 'citation', 'fullReference', 'otuId', 'occurrenceId', 'recommendedCitation'
   ]
@@ -1156,7 +1462,7 @@ function checklistExportContent() {
     for (const source of sourcesByTaxon.value.get(taxon.key) || []) {
       if (source.type === 'reference') {
         const citations = source.citations.map((citation) => citation.short).filter(Boolean)
-        distributions.push({ place: source.place || selectedCountry.value, citations })
+        distributions.push({ place: source.place || mapSelectionName.value, citations })
         source.citations.forEach((citation) => citation.fullReferences.forEach((reference) => references.add(reference)))
       } else {
         specimens.push(source.label)
@@ -1178,9 +1484,14 @@ function downloadCountryText() {
     'CHECKLIST',
     ''
   ]
+  let currentFamily = null
 
   for (const entry of taxa) {
     const { taxon } = entry
+    if (taxon.family !== currentFamily) {
+      currentFamily = taxon.family
+      lines.push(`${currentFamily || 'Family not recorded'}`.toUpperCase(), '')
+    }
     lines.push(`${taxon.name}${taxon.authorship ? ` ${taxon.authorship}` : ''}`)
     for (const distribution of entry.distributions) {
       lines.push(`  Distribution: ${distribution.place}${distribution.citations.length ? ` (${distribution.citations.join('; ')})` : ''}`)
@@ -1227,8 +1538,13 @@ function downloadCountryRtf() {
         '\\pard\\sb240\\sa100\\b CHECKLIST\\b0\\par'
       ]
 
+      let currentFamily = null
       for (const entry of taxa) {
         const { taxon } = entry
+    if (taxon.family !== currentFamily) {
+      currentFamily = taxon.family
+      lines.push(`\\pard\\sb160\\sa80\\b ${escapeRtf(currentFamily || 'Family not recorded')}\\b0\\par`)
+    }
     lines.push(`\\pard\\sa60\\i ${escapeRtf(taxon.name)}\\i0${taxon.authorship ? `\\~${escapeRtf(taxon.authorship)}` : ''}\\par`)
     for (const distribution of entry.distributions) {
       const citations = distribution.citations.length ? ` (${distribution.citations.join('; ')})` : ''
@@ -1488,21 +1804,15 @@ onMounted(() => {
   loadCountryCounts()
 })
 
-onBeforeUnmount(() => window.removeEventListener('hashchange', syncCountryFromHash))
-
-watch(selectedCountry, () => {
-  refreshMapStyles()
-  focusMapOnCountry()
-  subdivisionLayer?.bringToFront()
-  raiseCountryOutline()
-  updateSubdivisionLayer()
+onBeforeUnmount(() => {
+  window.removeEventListener('hashchange', syncCountryFromHash)
+  mapSelectionRequestId += 1
+  subdivisionLayerRequestId += 1
+  countryMapRef.value?.getMapObject?.()?.stop()
 })
 
-watch(selectedRegion, () => {
-  refreshMapStyles()
-  restyleSubdivisions()
-  focusMapOnSelection()
-})
+watch([selectedCountry, selectedRegion], syncMapSelection, { flush: 'post' })
 
+watch([countryCounts, countsLoading, countsError], refreshCountryTooltips)
 watch(regionCounts, restyleSubdivisions)
 </script>

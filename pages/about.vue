@@ -87,11 +87,12 @@
         <p class="leading-relaxed mb-3">Made possible by the wonderful:</p>
         <ul class="list-disc pl-6 space-y-2">
           <li>Josh R. Pletcher</li>
-          <li>Mike Hastriter</li>
+          <li>Michael W. Hastriter</li>
           <li>Bob Bossard</li>
-          <li>Sergei Medvedev</li>
-          <li>Lance Durden</li>
+          <li>Sergei G. Medvedev</li>
+          <li>Lance A. Durden</li>
           <li>Sonja Matthee</li>
+          <li>Michael F. Whiting</li>
         </ul>
       </article>
 

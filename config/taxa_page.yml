@@ -3,11 +3,13 @@ taxa_page:
     panels:
       - - - panel:flea-gallery
           - panel:type
-          - panel:type-specimen
+          - panel:type-specimen-detail
           - panel:nomenclature
-          - panel:nomenclature-references
+          - panel:references-all
 
         - - panel:map-v2
+          - id: panel:collection-metadata
+            rank_group: ['SpeciesGroup']
           - panel:descendants
           - panel:content
           - panel:keys
@@ -32,7 +34,7 @@ taxa_page:
       
   bibliography:
     panels:
-      - - - panel:nomenclature-references
+      - - - panel:references-all
       
 taxa_page_regions:
   taxa_page:header:taxonname:after:

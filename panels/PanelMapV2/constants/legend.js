@@ -13,7 +13,8 @@ export const LEGEND = {
   },
   Georeference: {
     label: 'Georeference',
-    background: 'bg-map-georeference'
+    background: 'bg-map-georeference',
+    shape: '[clip-path:polygon(50%_0,100%_100%,0_100%)] rounded-none'
   },
   CollectionObject: {
     label: 'Collection object',
@@ -21,7 +22,8 @@ export const LEGEND = {
   },
   TypeMaterial: {
     label: 'Primary type',
-    background: 'bg-map-type-material'
+    background: 'bg-map-type-material',
+    shape: 'rotate-45 rounded-none scale-90'
   },
   FieldOccurrence: {
     label: 'Field occurrence',
