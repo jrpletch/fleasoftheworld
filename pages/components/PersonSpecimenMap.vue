@@ -30,6 +30,17 @@ function popupFor(point) {
     row.textContent = line
     root.append(row)
   })
+  const specimenDetails = [
+    point.typeStatus,
+    [point.institutionCode, point.catalogNumber].filter(Boolean).join(' '),
+    point.recordedBy ? `Collected by ${point.recordedBy}` : '',
+    point.pages ? `Source page ${point.pages}` : ''
+  ].filter(Boolean)
+  specimenDetails.forEach((line) => {
+    const row = document.createElement('div')
+    row.textContent = line
+    root.append(row)
+  })
   if (point.otuId) {
     const link = document.createElement('a')
     link.href = `#/otus/${point.otuId}/overview`

@@ -29,7 +29,12 @@
       {{ empty }}
     </p>
     <template v-else>
-      <ul class="mt-2 space-y-1 text-sm">
+      <ul
+        class="mt-2 space-y-1 text-sm"
+        :class="taxa.length > SCROLL_THRESHOLD ? 'max-h-96 overflow-y-auto overscroll-contain pr-2' : ''"
+        :tabindex="taxa.length > SCROLL_THRESHOLD ? 0 : undefined"
+        :aria-label="taxa.length > SCROLL_THRESHOLD ? `${title} list` : undefined"
+      >
         <li
           v-for="taxon in visible"
           :key="taxon.id"
@@ -48,13 +53,18 @@
           />
           <span class="text-base-content/70">{{ taxon.authorYear }}</span>
           <span
-            v-if="taxon.rank && taxon.rank !== 'species'"
-            class="text-xs text-base-content/50"
-          >{{ taxon.rank }}</span>
-          <span
-            v-if="!taxon.valid"
-            class="text-xs text-base-content/50"
-          >not valid</span>
+            v-if="!taxon.valid && taxon.validName"
+            class="text-base-content/70"
+          >
+            (= <RouterLink
+              v-if="taxon.validOtuId"
+              :to="`/otus/${taxon.validOtuId}/overview`"
+              class="text-primary-color hover:underline dark:text-secondary-color"
+              v-html="taxon.validName"
+            /><span v-else v-html="taxon.validName" />
+            <span v-if="taxon.validNameAuthorYear" class="ml-1">{{ taxon.validNameAuthorYear }}</span>
+            )
+          </span>
         </li>
       </ul>
       <button
@@ -73,6 +83,7 @@
 import { computed, ref } from 'vue'
 
 const LIMIT = 25
+const SCROLL_THRESHOLD = 15
 
 const props = defineProps({
   title: { type: String, required: true },

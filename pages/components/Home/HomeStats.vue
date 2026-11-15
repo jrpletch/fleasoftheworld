@@ -55,7 +55,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { makeAPIRequest } from '@/utils/request'
 import AnimateNumber from '../AnimateNumber.vue'
 import HomeIcon from './HomeIcon.vue'
@@ -71,6 +71,7 @@ const counts = ref({
   images: null,
   collectionObjects: null
 })
+const SPECIES_COUNTS_CACHE_KEY = 'fow-home-species-counts-v1'
 
 // Keys returned by the /stats endpoint
 const STATS_KEYS = {
@@ -111,42 +112,73 @@ makeAPIRequest('/stats')
   })
   .catch(() => {})
 
-async function loadSpeciesCount() {
-  try {
-    const { headers } = await makeAPIRequest('/taxon_names.json', {
-      params: {
-        page: 1,
-        per: 1,
-        validity: true,
-        rank: ['NomenclaturalRank::Iczn::SpeciesGroup::Species']
-      }
-    })
-    const valid = Number(headers['pagination-total'])
-    if (!Number.isFinite(valid)) return
-    counts.value.validSpecies = valid
+let validSpeciesCount = null
+let fossilSpeciesCount = null
 
-    const { headers: fossilHeaders } = await makeAPIRequest('/taxon_names.json', {
-      params: {
-        page: 1,
-        per: 1,
-        validity: true,
-        descendants: true,
-        nomenclature_group: ['Species'],
-        taxon_name_classification: ['TaxonNameClassification::Iczn::Fossil'],
-        rank: ['NomenclaturalRank::Iczn::SpeciesGroup::Species']
-      }
-    })
-    const fossil = Number(fossilHeaders['pagination-total'])
-    if (Number.isFinite(fossil)) {
-      counts.value.validFossilSpecies = fossil
-      counts.value.validExtantSpecies = valid - fossil
+function updateSpeciesBreakdown() {
+  if (validSpeciesCount !== null) counts.value.validSpecies = validSpeciesCount
+  if (fossilSpeciesCount !== null) counts.value.validFossilSpecies = fossilSpeciesCount
+  if (validSpeciesCount !== null && fossilSpeciesCount !== null) {
+    counts.value.validExtantSpecies = validSpeciesCount - fossilSpeciesCount
+    try {
+      localStorage.setItem(SPECIES_COUNTS_CACHE_KEY, JSON.stringify({
+        validSpecies: validSpeciesCount,
+        validFossilSpecies: fossilSpeciesCount,
+        validExtantSpecies: validSpeciesCount - fossilSpeciesCount
+      }))
+    } catch {
+      // Counts still display if browser storage is unavailable.
     }
-  } catch {
-    // leave placeholders
   }
 }
 
-loadSpeciesCount()
+onMounted(() => {
+  try {
+    const cached = JSON.parse(localStorage.getItem(SPECIES_COUNTS_CACHE_KEY) || 'null')
+    if (!cached) return
+    if (counts.value.validSpecies === null && Number.isFinite(cached.validSpecies)) {
+      counts.value.validSpecies = cached.validSpecies
+    }
+    if (counts.value.validFossilSpecies === null && Number.isFinite(cached.validFossilSpecies)) {
+      counts.value.validFossilSpecies = cached.validFossilSpecies
+    }
+    if (counts.value.validExtantSpecies === null && Number.isFinite(cached.validExtantSpecies)) {
+      counts.value.validExtantSpecies = cached.validExtantSpecies
+    }
+  } catch {
+    // Ignore missing or invalid cached values.
+  }
+})
+
+function loadSpeciesCount(params, onCount) {
+  makeAPIRequest('/taxon_names.json', {
+    params: { page: 1, per: 1, validity: true, ...params }
+  })
+    .then(({ headers }) => {
+      const count = Number(headers['pagination-total'])
+      if (!Number.isFinite(count)) return
+      onCount(count)
+      updateSpeciesBreakdown()
+    })
+    .catch(() => {
+      // Leave the loading placeholder if this count is unavailable.
+    })
+}
+
+// Launch both species queries alongside /stats, and let each result update as soon as it arrives.
+loadSpeciesCount(
+  { rank: ['NomenclaturalRank::Iczn::SpeciesGroup::Species'] },
+  (count) => { validSpeciesCount = count }
+)
+loadSpeciesCount(
+  {
+    descendants: true,
+    nomenclature_group: ['Species'],
+    taxon_name_classification: ['TaxonNameClassification::Iczn::Fossil'],
+    rank: ['NomenclaturalRank::Iczn::SpeciesGroup::Species']
+  },
+  (count) => { fossilSpeciesCount = count }
+)
 </script>
 
 <style scoped>

@@ -88,6 +88,7 @@ async function load(next) {
         in_project: true,
         recent: true,
         recent_target: 'created_at',
+        extend: ['documents'],
         per: props.per,
         page: next
       }

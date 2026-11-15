@@ -78,6 +78,18 @@ const cards = [
     cta: 'Search literature'
   },
   {
+    to: '/request-pdf',
+    title: 'Request a PDF',
+    text: 'Ask us about a publication you cannot access. Include its citation or DOI and we’ll follow up if a copy is available.',
+    cta: 'Request a paper'
+  },
+  {
+    to: '/siphonapterists',
+    title: 'Siphonapterists',
+    text: 'Explore profiles of flea researchers, their publications, named taxa, and collected specimens.',
+    cta: 'Meet the researchers'
+  },
+  {
     to: '/fleanews',
     title: 'Flea News',
     text: 'Browse newsletter issues by year or search their text for flea-related publications and topics.',

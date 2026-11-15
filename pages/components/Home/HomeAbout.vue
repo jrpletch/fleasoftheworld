@@ -61,7 +61,7 @@
           <ul class="mt-3 grid gap-2 sm:grid-cols-2 text-sm text-base-content/75 [&_a]:!text-primary-color dark:[&_a]:!text-secondary-color">
             <li>
               <span class="block font-medium text-base-content">Josh Pletcher</span>
-              <address-maker :items="['jpletche', 'nmu', 'edu']" />
+              <address-maker :items="['editor.fleasoftheworld', 'gmail', 'com']" />
             </li>
           </ul>
         </div>

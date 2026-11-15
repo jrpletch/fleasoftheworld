@@ -2,6 +2,7 @@ import { ref, computed, watch, onBeforeUnmount } from 'vue'
 import {
   useGbifMatch,
   deriveScientificName,
+  deriveTaxonRank,
   CHECKLIST_KEY
 } from '../../_gbifShared/useGbifMatch'
 
@@ -13,8 +14,8 @@ const GBIF_HUE = 163
 export function useGbifOverlay({ mapRef, taxon, otu }) {
   const enabled = ref(true)
   const scientificName = computed(() => deriveScientificName(taxon, otu))
-  const { gbifKey } = useGbifMatch(scientificName)
-  // The capabilities endpoint ignores basisOfRecord, so a count can't confirm specimens exist
+  const taxonRank = computed(() => deriveTaxonRank(taxon, otu))
+  const { gbifKey } = useGbifMatch(scientificName, taxonRank)
   const hasRecords = computed(() => !!gbifKey.value)
 
   let layer = null
@@ -28,21 +29,27 @@ export function useGbifOverlay({ mapRef, taxon, otu }) {
   }
 
   function removeLayer() {
-    if (layer) {
-      layer.remove()
-      layer = null
-    }
+    layer?.remove()
+    layer = null
   }
 
   async function syncLayer() {
     removeLayer()
 
     const map = mapRef.value?.getMapObject?.()
-    if (!map || !enabled.value || !hasRecords.value || !gbifKey.value) return
+    if (!map || !enabled.value || !gbifKey.value) return
 
     const L = (await import('leaflet')).default
     // State may have changed while Leaflet was loading
-    if (!enabled.value || !hasRecords.value || layer) return
+    if (!enabled.value || mapRef.value?.getMapObject?.() !== map || !gbifKey.value) return
+
+    // Tile layers sit under vector shapes by default; use a pane above them
+    if (!map.getPane('gbifPane')) {
+      const pane = map.createPane('gbifPane')
+      pane.style.zIndex = 450
+      pane.style.pointerEvents = 'none'
+    }
+    applyFilter(map)
 
     const params = new URLSearchParams({
       style: 'red.poly',
@@ -53,15 +60,6 @@ export function useGbifOverlay({ mapRef, taxon, otu }) {
       basisOfRecord: BASIS_OF_RECORD,
       srs: 'EPSG:3857'
     })
-
-    // Tile layers sit under vector shapes by default; use a pane above them
-    if (!map.getPane('gbifPane')) {
-      const pane = map.createPane('gbifPane')
-      pane.style.zIndex = 450
-      pane.style.pointerEvents = 'none'
-    }
-    applyFilter(map)
-
     layer = L.tileLayer(`${TILE_URL}?${params}`, {
       pane: 'gbifPane',
       attribution:
@@ -71,7 +69,7 @@ export function useGbifOverlay({ mapRef, taxon, otu }) {
     }).addTo(map)
   }
 
-  watch([enabled, hasRecords, gbifKey, () => mapRef.value], syncLayer, {
+  watch([enabled, gbifKey, () => mapRef.value], syncLayer, {
     immediate: true
   })
 

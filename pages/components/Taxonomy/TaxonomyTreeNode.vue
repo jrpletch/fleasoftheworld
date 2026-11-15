@@ -41,6 +41,28 @@
         :to="{ name: 'otus-id', params: { id: node.otu_id } }"
         v-html="node.name"
       />
+      <svg
+        v-if="hasImages"
+        class="ml-0.5 h-3.5 w-3.5 flex-shrink-0 text-base-content/55"
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.8"
+        aria-label="Images available"
+        role="img"
+        title="Images available"
+      >
+        <path stroke-linecap="round" stroke-linejoin="round" d="M5 7h3l1.5-2h5L16 7h3a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9a2 2 0 0 1 2-2Z" />
+        <circle cx="12" cy="13" r="3" />
+      </svg>
+      <span
+        v-if="photoSummary?.photographed"
+        class="ml-0.5 flex-shrink-0 text-xs tabular-nums text-base-content/55"
+        :aria-label="`${photoSummary.photographed} of ${photoSummary.total} species have images`"
+      >
+        ({{ photoSummary.photographed }}/{{ photoSummary.total }})
+      </span>
       <span
         v-if="speciesCount !== null"
         class="ml-1 flex-shrink-0 whitespace-nowrap text-xs tabular-nums text-base-content/55"
@@ -86,6 +108,7 @@
 
 <script>
 import { makeAPIRequest } from '@/utils/request'
+import { getTaxonPhotoSummary, getTaxonRank, hasSpeciesImages } from '../../data/taxonImageAvailability'
 
 const SPECIES_RANK = 'NomenclaturalRank::Iczn::SpeciesGroup::Species'
 const SUBSPECIES_RANK = 'NomenclaturalRank::Iczn::SpeciesGroup::Subspecies'
@@ -145,10 +168,22 @@ const clearTaxonHighlight = inject('clearTaxonHighlight', () => {})
 const trackTreeOverride = inject('trackTreeOverride', () => {})
 const resetTreeVersion = inject('resetTreeVersion', ref(0))
 const speciesCount = ref(null)
+const hasImages = ref(false)
+const photoSummary = ref(null)
 const defaultOpen = computed(() => Boolean(props.defaultOpen || props.node.expand_open))
 const isOpen = ref(defaultOpen.value)
 const children = shallowRef([...(props.node.descendants || [])])
 const loading = ref(false)
+
+onMounted(async () => {
+  const rank = String(props.node.display_rank || await getTaxonRank(props.node.otu_id)).toLowerCase()
+  if (rank === 'species') {
+    hasImages.value = await hasSpeciesImages(props.node.otu_id, rank)
+  } else {
+    photoSummary.value = await getTaxonPhotoSummary(props.node.otu_id)
+    hasImages.value = Boolean(photoSummary.value?.photographed)
+  }
+})
 
 const highlighted = computed(() => props.path.length === 1 && props.path[0] === props.node.otu_id)
 

@@ -27,7 +27,7 @@
             <div class="wid-search w-full">
               <GlobalSearch
                 autofocus
-                placeholder="Search a taxon, reference or author"
+                placeholder="Search a taxon, reference or author, e.g. Rothschild, N.C."
               />
             </div>
           </div>

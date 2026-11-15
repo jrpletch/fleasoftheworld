@@ -6,7 +6,22 @@
       class="flex items-center gap-2"
       :title="`${row.label}: ${row.tw + row.gbif} (TaxonWorks ${row.tw}, GBIF ${row.gbif})`"
     >
+      <a
+        v-if="row.href"
+        :href="row.href"
+        :title="row.title"
+        target="_blank"
+        rel="noopener noreferrer"
+        :class="[
+          'shrink-0 text-right',
+          wrap ? 'break-words' : 'truncate',
+          labelClass,
+          'text-primary underline decoration-primary/40 underline-offset-2 hover:decoration-primary'
+        ]"
+        >{{ row.label }}</a
+      >
       <span
+        v-else
         :class="[
           'shrink-0 text-right',
           wrap ? 'break-words' : 'truncate',

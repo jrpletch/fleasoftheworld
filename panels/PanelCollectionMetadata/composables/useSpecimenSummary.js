@@ -3,6 +3,7 @@ import { makeAPIRequest } from '@/utils'
 import {
   useGbifMatch,
   deriveScientificName,
+  deriveTaxonRank,
   CHECKLIST_KEY
 } from '../../_gbifShared/useGbifMatch'
 import { assignBiomes } from '../utils/biomes.js'
@@ -209,7 +210,8 @@ async function lookupElevations(points) {
 
 export function useSpecimenSummary({ otuId, taxon, otu }) {
   const scientificName = computed(() => deriveScientificName(taxon, otu))
-  const { gbifKey, loading: matching } = useGbifMatch(scientificName)
+  const taxonRank = computed(() => deriveTaxonRank(taxon, otu))
+  const { gbifKey, loading: matching } = useGbifMatch(scientificName, taxonRank)
 
   const loadingTaxonWorks = ref(true)
   const loadingGbif = ref(false)

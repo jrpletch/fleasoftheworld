@@ -10,7 +10,7 @@ taxa_page:
         - - panel:map-v2
           - id: panel:collection-metadata
             rank_group: ['SpeciesGroup']
-          - panel:descendants
+          - panel:descendants-with-images
           - panel:content
           - panel:keys
           - panel:etymology

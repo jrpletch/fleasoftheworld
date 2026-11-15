@@ -123,15 +123,31 @@
             <h2 class="text-2xl font-semibold">
               {{ displayName }}
             </h2>
-            <p
-              v-if="lifespan"
-              class="text-sm text-base-content/70"
+            <div
+              v-if="lifespan || activeYears"
+              class="flex flex-wrap gap-x-3 text-sm text-base-content/70"
             >
-              {{ lifespan }}
-            </p>
-            <p class="mt-3 text-sm leading-relaxed">
-              {{ summary }}
-            </p>
+              <span v-if="lifespan">{{ lifespan }}</span>
+              <span v-if="activeYears">{{ activeYears }}</span>
+            </div>
+            <div class="mt-3 border-t border-base-border/50 pt-3">
+              <div class="flex flex-wrap items-center justify-between gap-2">
+                <p class="text-xs font-semibold text-base-content/65">Recommended citation</p>
+                <button
+                  type="button"
+                  class="rounded-md border border-base-border px-2.5 py-1.5 text-xs font-medium hover:bg-base-muted/40 disabled:cursor-wait disabled:opacity-50"
+                  :disabled="profileExportLoading || !recommendedCitation"
+                  title="Download this profile, project publications, and named taxa as an RTF document."
+                  @click="downloadProfileRtf"
+                >
+                  Download RTF
+                </button>
+              </div>
+              <div class="mt-1 flex items-start justify-between gap-3">
+                <p class="min-w-0 text-xs leading-relaxed text-base-content/70">{{ recommendedCitation }}</p>
+                <VClipboard :text="recommendedCitation" />
+              </div>
+            </div>
             <div
               v-if="articleParagraphs.length"
               class="mt-4 max-w-prose space-y-3 text-sm leading-relaxed"
@@ -144,7 +160,18 @@
               </p>
             </div>
             <p
-              v-else
+              v-if="!profile.article?.length && biographyCitations.length"
+              class="mt-2 max-w-prose text-xs leading-relaxed text-base-content/60"
+            >
+              <span class="font-semibold">Biography source: </span>
+              <template v-for="(citation, index) in biographyCitations" :key="citation.id">
+                <span v-html="citation.html" />
+                <span v-if="citation.pages">, {{ citation.pages }}</span>
+                <span v-if="index < biographyCitations.length - 1">; </span>
+              </template>
+            </p>
+            <p
+              v-if="!articleParagraphs.length"
               class="mt-4 text-sm text-base-content/55"
             >
               No biography has been added for this person yet.
@@ -206,7 +233,13 @@
             >
               No publications recorded.
             </p>
-            <template v-else>
+            <div
+              v-else
+              class="mt-2"
+              :class="publications.length > 12 ? 'max-h-96 overflow-y-auto overscroll-contain pr-2' : ''"
+              :tabindex="publications.length > 12 ? 0 : undefined"
+              :aria-label="publications.length > 12 ? 'Publications list' : undefined"
+            >
               <template
                 v-for="group in publicationGroups"
                 :key="group.year"
@@ -228,10 +261,15 @@
                       target="_blank"
                       rel="noopener noreferrer"
                     >DOI</a>
+                    <RouterLink
+                      v-if="publication.hasAttachedCitations"
+                      :to="`/sources/${publication.id}`"
+                      class="ml-1 text-primary-color hover:underline dark:text-secondary-color"
+                    >Source details</RouterLink>
                   </li>
                 </ul>
               </template>
-            </template>
+            </div>
           </section>
 
           <div class="space-y-8">
@@ -256,10 +294,11 @@
 </template>
 
 <script setup>
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import PersonSpecimenMap from './components/PersonSpecimenMap.vue'
 import TaxonList from './components/TaxonList.vue'
+import { fetchSourceCitationCounts } from './data/sourceProfile.js'
 import {
   fetchBiography,
   fetchCollected,
@@ -292,6 +331,9 @@ const namedFor = ref(null)
 const collected = ref(null)
 const portrait = ref(null)
 const biography = ref([])
+const biographyCitations = ref([])
+const citationUrl = ref('')
+const citationAccessDate = ref('')
 // A curated article in the profile overrides the TaxonWorks "Biography" data attribute
 const articleParagraphs = computed(() =>
   profile.value.article?.length ? profile.value.article : biography.value
@@ -300,7 +342,7 @@ const articleParagraphs = computed(() =>
 const portraitSrc = computed(() =>
   profile.value.image ? `${baseUrl}${profile.value.image}` : portrait.value?.src
 )
-const loading = reactive({ publications: false, namedBy: false, namedFor: false, collected: false })
+const loading = reactive({ publications: false, namedBy: false, namedFor: false, collected: false, biography: false })
 
 let searchTimer
 watch(term, (value) => {
@@ -335,6 +377,17 @@ const profile = computed(() => siphonapteristProfiles[selectedId.value] || {})
 const personIds = computed(() => [Number(selectedId.value), ...(profile.value.ids || [])])
 
 const displayName = computed(() => (person.value ? personName(person.value) : ''))
+const {
+  project_name: projectName = 'Fleas of the World',
+  project_authors: projectAuthors = ''
+} = __APP_ENV__
+const recommendedCitation = computed(() => {
+  if (!displayName.value || !citationUrl.value || !citationAccessDate.value) return ''
+  return `${projectAuthors || projectName} (${new Date().getFullYear()}). ${projectName}: ${displayName.value}. Accessed ${citationAccessDate.value}. ${citationUrl.value}`
+})
+const profileExportLoading = computed(() =>
+  loading.publications || loading.namedBy || loading.namedFor || loading.biography
+)
 const initials = computed(() =>
   [person.value?.first_name, person.value?.last_name]
     .filter(Boolean)
@@ -348,6 +401,12 @@ const lifespan = computed(() => {
   if (!p) return ''
   if (p.year_born || p.year_died) return `${p.year_born || '?'}–${p.year_died || '?'}`
   return ''
+})
+
+const activeYears = computed(() => {
+  const p = person.value
+  if (!p?.year_active_start) return ''
+  return `Active ${p.year_active_start}${p.year_active_end && p.year_active_end !== p.year_active_start ? `–${p.year_active_end}` : ''}`
 })
 
 const summary = computed(() => {
@@ -383,11 +442,15 @@ const publicationGroups = computed(() => {
 })
 
 async function load(id) {
+  Object.keys(loading).forEach((key) => { loading[key] = false })
   person.value = null
   error.value = false
   publications.value = namedBy.value = namedFor.value = collected.value = null
   portrait.value = null
   biography.value = []
+  biographyCitations.value = []
+  citationUrl.value = ''
+  citationAccessDate.value = ''
   if (!id) return
 
   const ids = [Number(id), ...(siphonapteristProfiles[id]?.ids || [])]
@@ -414,7 +477,17 @@ async function load(id) {
     return
   }
 
-  guard(fetchPublications(ids, person.value), 'publications', publications)
+  const publicationRequest = fetchPublications(ids, person.value)
+  guard(publicationRequest, 'publications', publications)
+  publicationRequest.then((items) => {
+    fetchSourceCitationCounts(items.map((item) => item.id)).then((counts) => {
+      if (selectedId.value !== id) return
+      publications.value = items.map((item) => ({
+        ...item,
+        hasAttachedCitations: (counts.get(String(item.id)) || 0) > 0
+      }))
+    })
+  }).catch(() => {})
   guard(fetchNamedBy(ids), 'namedBy', namedBy)
   guard(fetchNamedFor(person.value.last_name), 'namedFor', namedFor)
   guard(fetchCollected(ids), 'collected', collected)
@@ -423,12 +496,128 @@ async function load(id) {
       if (selectedId.value === id) portrait.value = value
     })
     .catch(() => {})
+  loading.biography = true
   fetchBiography(ids)
-    .then((value) => {
-      if (selectedId.value === id) biography.value = value
+    .then(({ paragraphs, citations }) => {
+      if (selectedId.value === id) {
+        biography.value = paragraphs
+        biographyCitations.value = citations
+      }
     })
     .catch(() => {})
+    .finally(() => {
+      if (selectedId.value === id) loading.biography = false
+    })
 }
 
 watch(selectedId, load, { immediate: true })
+
+function updateCitationContext() {
+  if (typeof window === 'undefined' || !selectedId.value) return
+  citationAccessDate.value = new Date().toLocaleDateString('en-GB', {
+    day: 'numeric', month: 'long', year: 'numeric'
+  })
+  citationUrl.value = window.location.href
+}
+
+onMounted(updateCitationContext)
+watch(selectedId, async () => {
+  await nextTick()
+  updateCitationContext()
+})
+
+function escapeRtf(value) {
+  let output = ''
+  const appendUnicode = (unit) => {
+    output += `\\u${unit > 32767 ? unit - 65536 : unit}?`
+  }
+  for (const character of String(value ?? '')) {
+    const codePoint = character.codePointAt(0)
+    if (character === '\\' || character === '{' || character === '}') output += `\\${character}`
+    else if (codePoint >= 32 && codePoint <= 126) output += character
+    else if (codePoint <= 0xffff) appendUnicode(codePoint)
+    else {
+      const adjusted = codePoint - 0x10000
+      appendUnicode(0xd800 + (adjusted >> 10))
+      appendUnicode(0xdc00 + (adjusted & 0x3ff))
+    }
+  }
+  return output
+}
+
+function plainText(html) {
+  const element = document.createElement('div')
+  element.innerHTML = html || ''
+  return element.textContent?.replace(/\s+/g, ' ').trim() || ''
+}
+
+function downloadFile(filename, content, type) {
+  const url = URL.createObjectURL(new Blob([content], { type }))
+  const link = document.createElement('a')
+  link.href = url
+  link.download = filename
+  document.body.append(link)
+  link.click()
+  link.remove()
+  window.setTimeout(() => URL.revokeObjectURL(url), 0)
+}
+
+function downloadProfileRtf() {
+  if (profileExportLoading.value || !person.value) return
+  const date = new Date().toISOString().slice(0, 10)
+  const lines = [
+    '{\\rtf1\\ansi\\deff0{\\fonttbl{\\f0\\fswiss\\fcharset0 Arial;}}\\viewkind4\\uc1',
+    `\\pard\\qc\\sa240\\fs32\\b ${escapeRtf(displayName.value)}\\b0\\fs24\\par`,
+    `\\pard\\qc\\sa160\\fs20 ${escapeRtf(lifespan.value || 'Siphonapterist profile')}\\fs24\\par`,
+    `\\pard\\sa120 Recommended citation: ${escapeRtf(recommendedCitation.value)}\\par`,
+    `\\pard\\sb200\\sa100\\b BIOGRAPHICAL DETAILS\\b0\\par`
+  ]
+
+  if (activeYears.value) lines.push(`\\pard\\sa100 ${escapeRtf(activeYears.value)}\\par`)
+  const paragraphs = articleParagraphs.value.length
+    ? articleParagraphs.value
+    : ['No biography has been added for this person yet.']
+  paragraphs.forEach((paragraph) => lines.push(`\\pard\\sa100 ${escapeRtf(paragraph)}\\par`))
+
+  lines.push('\\pard\\sb200\\sa100\\b PUBLICATIONS\\b0\\par')
+  let currentYear = null
+  for (const publication of publications.value || []) {
+    const year = publication.year || 'Undated'
+    if (year !== currentYear) {
+      currentYear = year
+      lines.push(`\\pard\\sb120\\sa60\\b ${escapeRtf(year)}\\b0\\par`)
+    }
+    const citation = plainText(publication.citation)
+    const doi = publication.doi ? ` DOI: https://doi.org/${publication.doi}` : ''
+    lines.push(`\\pard\\sa80 ${escapeRtf(citation + doi)}\\par`)
+  }
+  if (!publications.value?.length) lines.push('\\pard\\sa80 No project publications recorded.\\par')
+
+  const addTaxa = (title, taxa, empty) => {
+    lines.push(`\\pard\\sb200\\sa100\\b ${escapeRtf(title)}\\b0\\par`)
+    if (!taxa?.length) {
+      lines.push(`\\pard\\sa80 ${escapeRtf(empty)}\\par`)
+      return
+    }
+    for (const taxon of taxa) {
+      const details = [
+        plainText(taxon.html),
+        taxon.authorYear,
+        !taxon.valid && taxon.validName
+          ? `(= ${plainText(taxon.validName)}${taxon.validNameAuthorYear ? ` ${taxon.validNameAuthorYear}` : ''})`
+          : ''
+      ]
+        .filter(Boolean)
+        .join(' ')
+      lines.push(`\\pard\\sa80 ${escapeRtf(details)}\\par`)
+    }
+  }
+
+  addTaxa('TAXA NAMED BY THIS PERSON', namedBy.value, 'No taxa are recorded with this person as author.')
+  addTaxa('TAXA NAMED FOR THIS PERSON', namedFor.value, 'No taxa with names that appear to honor this person were found.')
+  lines.push('}')
+
+  const slug = displayName.value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'siphonapterist'
+  downloadFile(`FleasOfTheWorld_${slug}_profile_${date}.rtf`, lines.join('\r\n'), 'application/rtf')
+}
 </script>

@@ -82,9 +82,10 @@ function total(path, entries) {
 async function describeFleaWork(person) {
   const author = ['author_id[]', person.id]
   const [authored, onFleaNames, namesAuthored, onFleaData] = await Promise.all([
-    total('/sources', [author]),
+    total('/sources', [author, ['in_project', true]]),
     total('/sources', [
       author,
+      ['in_project', true],
       ['taxon_name_id[]', SIPHONAPTERA_TAXON_NAME_ID],
       ['descendants', true]
     ]),
@@ -94,6 +95,7 @@ async function describeFleaWork(person) {
     ]),
     total('/sources', [
       author,
+      ['in_project', true],
       ...FLEA_CITATION_TYPES.map((type) => ['citation_object_type[]', type])
     ])
   ])
@@ -121,6 +123,77 @@ export async function searchPeople(term) {
     .filter((p) => p.isFleaWorker && p.publications > 0)
 }
 
+const normalizePersonName = (value) =>
+  String(value || '')
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase()
+    .replace(/[^a-z0-9]/g, '')
+
+function matchesAuthorName(authorName, personLabel) {
+  if (normalizePersonName(authorName) === normalizePersonName(personLabel)) return true
+
+  const authorParts = authorName.includes(',')
+    ? authorName.split(',').map((part) => part.trim())
+    : [authorName.trim().split(/\s+/).at(-1), authorName.trim().split(/\s+/).slice(0, -1).join(' ')]
+  const personParts = String(personLabel || '').split(',').map((part) => part.trim())
+  const authorSurname = normalizePersonName(authorParts[0])
+  const personSurname = normalizePersonName(personParts[0])
+  if (!authorSurname || authorSurname !== personSurname || !personParts[1]) return false
+
+  const initials = (value) => {
+    const tokens = String(value || '').match(/[a-z]+/gi) || []
+    return tokens.length && tokens.every((token) => token.length === 1)
+      ? tokens.join('').toLocaleLowerCase()
+      : tokens.map((token) => token[0].toLocaleLowerCase()).join('')
+  }
+  const authorInitials = initials(authorParts[1] || '')
+  const personInitials = initials(personParts[1])
+  return authorInitials.length > 0 && authorInitials === personInitials
+}
+
+const siphonapteristAuthorCache = new Map()
+
+// Resolve a source's full author names to people who qualify for the
+// Siphonapterists directory, using the same flea-work check as its search.
+export async function findSiphonapteristAuthors(authorString) {
+  const authors = String(authorString || '')
+    .split(/\s+and\s+/i)
+    .map((name) => name.trim())
+    .filter(Boolean)
+
+  const matches = await Promise.all(authors.map(async (authorName) => {
+    const cacheKey = normalizePersonName(authorName)
+    if (!cacheKey) return null
+    if (siphonapteristAuthorCache.has(cacheKey)) return siphonapteristAuthorCache.get(cacheKey)
+
+    const surname = authorName.includes(',') ? authorName.split(',')[0].trim() : authorName.trim().split(/\s+/).at(-1)
+    try {
+      const { data } = await makeAPIRequest.get('/people/autocomplete', { params: { term: surname } })
+      const person = (data || [])
+        .map(parseSuggestion)
+        .find((candidate) =>
+          /Author/.test(candidate.roles) && matchesAuthorName(authorName, candidate.label)
+        )
+      if (!person) {
+        siphonapteristAuthorCache.set(cacheKey, null)
+        return null
+      }
+
+      const work = await describeFleaWork(person)
+      const result = work.isFleaWorker && work.publications > 0
+        ? { id: person.id, label: person.label }
+        : null
+      siphonapteristAuthorCache.set(cacheKey, result)
+      return result
+    } catch {
+      return null
+    }
+  }))
+
+  return matches.filter(Boolean)
+}
+
 // Biography text kept in the person's "Biography" data attribute in TaxonWorks, as paragraphs.
 export async function fetchBiography(ids) {
   const { data } = await makeAPIRequest.get(
@@ -133,7 +206,38 @@ export async function fetchBiography(ids) {
   const entry = (data || [])
     .filter((d) => d.predicate_name === 'Biography' && d.value?.trim())
     .sort((a, b) => ids.indexOf(a.attribute_subject_id) - ids.indexOf(b.attribute_subject_id))[0]
-  return entry ? entry.value.split(/\r?\n+/).map((p) => p.trim()).filter(Boolean) : []
+  if (!entry) return { paragraphs: [], citations: [] }
+
+  let citationData = []
+  try {
+    const response = await makeAPIRequest.get('/citations', {
+      params: {
+        citation_object_type: 'DataAttribute',
+        citation_object_id: [entry.id],
+        extend: ['source'],
+        per: 100
+      }
+    })
+    citationData = response.data || []
+  } catch {
+    // The biography is still useful if its optional citations fail to load.
+  }
+  const citations = (citationData || [])
+    .map((citation) => {
+      const source = citation.source?.cached || citation.citation_source_body || ''
+      if (!source.trim()) return null
+      return {
+        id: citation.id,
+        html: safeHtml(source),
+        pages: citation.pages || ''
+      }
+    })
+    .filter(Boolean)
+
+  return {
+    paragraphs: entry.value.split(/\r?\n+/).map((p) => p.trim()).filter(Boolean),
+    citations
+  }
 }
 
 // First image depicting the person; earlier ids (the selected record) win over merged duplicates.
@@ -181,7 +285,10 @@ function boldAuthor(html, person) {
 }
 
 export async function fetchPublications(ids, person) {
-  const sources = await getAll('/sources', idParams('author_id', ids))
+  const sources = await getAll('/sources', [
+    ...idParams('author_id', ids),
+    ['in_project', true]
+  ])
   return sources
     .map((s) => ({
       id: s.id,
@@ -212,23 +319,53 @@ async function otuIdsByTaxonName(taxonNameIds) {
   )
   responses
     .flatMap((r) => r.data || [])
-    .forEach((otu) => map.has(otu.taxon_name_id) || map.set(otu.taxon_name_id, otu.id))
+    .forEach((otu) => {
+      const nameId = String(otu.taxon_name_id)
+      if (!map.has(nameId)) map.set(nameId, otu.id)
+    })
   return map
 }
 
-async function withOtus(names) {
-  const otus = await otuIdsByTaxonName(
-    names.flatMap((n) => [n.id, n.cached_valid_taxon_name_id])
+async function taxonNamesById(taxonNameIds) {
+  const unique = [...new Set(taxonNameIds.filter(Boolean).map(String))]
+  const chunks = []
+  for (let i = 0; i < unique.length; i += OTU_CHUNK) chunks.push(unique.slice(i, i + OTU_CHUNK))
+
+  const responses = await Promise.all(
+    chunks.map((chunk) =>
+      makeAPIRequest.get(`/taxon_names?${query([...idParams('taxon_name_id', chunk), ['per', chunk.length]])}`)
+    )
   )
-  return names.map((n) => ({
-    id: n.id,
-    html: safeHtml(n.cached_html || n.cached),
-    authorYear: n.cached_author_year || '',
-    year: n.year_of_publication ? Number(n.year_of_publication) : n.year ? Number(n.year) : null,
-    rank: n.rank || '',
-    valid: n.cached_is_valid !== false,
-    otuId: otus.get(n.id) || otus.get(n.cached_valid_taxon_name_id) || null
-  }))
+  return new Map(responses.flatMap((response) => response.data || []).map((name) => [String(name.id), name]))
+}
+
+async function withOtus(names) {
+  const invalidNames = names.filter((name) => name.cached_is_valid === false)
+  const [otus, acceptedNames] = await Promise.all([
+    otuIdsByTaxonName(names.flatMap((name) => [name.id, name.cached_valid_taxon_name_id])),
+    taxonNamesById(invalidNames.map((name) => name.cached_valid_taxon_name_id))
+  ])
+
+  return names.map((name) => {
+    const acceptedId = String(name.cached_valid_taxon_name_id || '')
+    const acceptedName = acceptedNames.get(acceptedId)
+    return {
+      id: name.id,
+      html: safeHtml(name.cached_html || name.cached),
+      authorYear: name.cached_author_year || '',
+      year: name.year_of_publication ? Number(name.year_of_publication) : name.year ? Number(name.year) : null,
+      rank: name.rank || '',
+      valid: name.cached_is_valid !== false,
+      validName: acceptedName ? safeHtml(acceptedName.cached_html || acceptedName.cached || acceptedName.name) : '',
+      validNameAuthorYear: acceptedName?.cached_author_year || '',
+      validOtuId: acceptedId ? otus.get(acceptedId) || null : null,
+      // Invalid names are displayed as plain text; their accepted name below
+      // remains linked to the valid taxon page.
+      otuId: name.cached_is_valid === false
+        ? null
+        : otus.get(String(name.id)) || otus.get(acceptedId) || null
+    }
+  })
 }
 
 const byYear = (a, b) =>

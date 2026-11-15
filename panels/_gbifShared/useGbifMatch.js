@@ -52,7 +52,7 @@ function getOrFetch(name) {
   return cache.get(name)
 }
 
-export function useGbifMatch(scientificName) {
+export function useGbifMatch(scientificName, expectedRank) {
   const loading = ref(false)
   const error = ref(false)
   const match = ref(null)
@@ -95,7 +95,21 @@ export function useGbifMatch(scientificName) {
     isSynonym.value ? match.value.acceptedUsage : match.value?.usage
   )
 
-  const gbifKey = computed(() => targetUsage.value?.key)
+  const normalizedExpectedRank = computed(() =>
+    rankName(typeof expectedRank === 'function' ? expectedRank() : expectedRank?.value ?? expectedRank)
+  )
+  const isHigherRankMatch = computed(() => {
+    const matchedRank = rankName(targetUsage.value?.rank)
+    const pageRank = normalizedExpectedRank.value
+    return (
+      RANK_ORDER[matchedRank] !== undefined &&
+      RANK_ORDER[pageRank] !== undefined &&
+      RANK_ORDER[matchedRank] < RANK_ORDER[pageRank]
+    )
+  })
+  const gbifKey = computed(() =>
+    isHigherRankMatch.value ? null : targetUsage.value?.key
+  )
 
   const classification = computed(() => match.value?.classification || [])
 
@@ -131,6 +145,23 @@ export const gbifMenuOptions = [
 
 // "Genus (Subgenus) epithet epithet Author" where both epithets match
 const NOMINATE_SUBSPECIES = /^([A-Z][a-z-]+)(?:\s+\([^)]*\))?\s+([a-z-]+)\s+\2\b/
+const RANK_ORDER = {
+  KINGDOM: 1,
+  PHYLUM: 2,
+  CLASS: 3,
+  ORDER: 4,
+  FAMILY: 5,
+  SUBFAMILY: 6,
+  TRIBE: 7,
+  GENUS: 8,
+  SUBGENUS: 9,
+  SPECIES: 10,
+  SUBSPECIES: 11,
+  VARIETY: 12,
+  FORM: 13
+}
+
+const rankName = (rank) => String(rank || '').split('::').at(-1).trim().toUpperCase()
 
 // Our nominate subspecies stand in for their species, so GBIF records of the
 // species are matched to them (GBIF holds those records at species level).
@@ -139,4 +170,10 @@ export function deriveScientificName(taxon, otu) {
   const nominate = name.match(NOMINATE_SUBSPECIES)
 
   return nominate ? `${nominate[1]} ${nominate[2]}` : name
+}
+
+export function deriveTaxonRank(taxon, otu) {
+  const name = taxon?.full_name || taxon?.name || otu?.object_label || ''
+  if (name.match(NOMINATE_SUBSPECIES)) return 'SPECIES'
+  return rankName(taxon?.rank_string || taxon?.rank)
 }

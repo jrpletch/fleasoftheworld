@@ -26,6 +26,13 @@
         class="border-b border-base-muted p-3 px-5"
       >
         <span v-html="sanitizeAndLinkifyHtml(reference.html)" />
+        <RouterLink
+          v-if="reference.sourceId"
+          :to="`/sources/${reference.sourceId}`"
+          class="ml-2 text-xs font-semibold text-primary-color hover:underline dark:text-secondary-color"
+        >
+          Source details
+        </RouterLink>
         <VBadge
           v-for="type in reference.types"
           :key="type"
@@ -107,14 +114,15 @@ function citationReferences(items) {
   const bySource = new Map()
 
   for (const citation of items.flatMap((item) => item.citations || [])) {
-    const id = citation.source?.id
+    const id = citation.source?.id || citation.source_id
     if (!id) continue
 
     if (!bySource.has(id)) {
       bySource.set(id, {
         key: `source-${id}`,
-        html: citation.source.cached,
-        year: citation.source.year ?? 0,
+        sourceId: id,
+        html: citation.source?.cached || citation.citation_source_body || '',
+        year: citation.source?.year ?? 0,
         types: new Set(),
         topics: new Set(),
         tags: new Set()

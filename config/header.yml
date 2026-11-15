@@ -31,6 +31,8 @@
           link: /resources/tw/filter/bibliography
         - label: Flea collections
           link: /collections
+        - label: PDF processor
+          link: /pdf-processor
 
     - label: Flea News
       link: /fleanews

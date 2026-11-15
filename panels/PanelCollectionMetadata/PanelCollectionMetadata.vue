@@ -143,7 +143,7 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import StackedBars from './components/StackedBars.vue'
 import HorizontalBars from './components/HorizontalBars.vue'
 import ElevationMountain from './components/ElevationMountain.vue'
@@ -191,6 +191,33 @@ const {
 
 const grandTotal = computed(() => totals.value.tw + totals.value.gbif)
 
+const institutionDetails = ref({})
+let institutionLookupRun = 0
+watch(institutions, async (items) => {
+  const run = ++institutionLookupRun
+  const displayedInstitutions = items.slice(0, MAX_INSTITUTIONS)
+  const results = await Promise.all(displayedInstitutions.map(async ({ name }) => {
+    try {
+      const response = await fetch(
+        `https://api.gbif.org/v1/grscicoll/institution?code=${encodeURIComponent(name)}&limit=100`
+      )
+      if (!response.ok) return null
+      const data = await response.json()
+      const institution = data.results?.[0]
+      if (data.results?.length !== 1 || !institution?.key) return null
+      return [name, {
+        href: `https://www.gbif.org/grscicoll/institution/${institution.key}`,
+        title: institution.name || name
+      }]
+    } catch {
+      return null
+    }
+  }))
+
+  if (run !== institutionLookupRun) return
+  institutionDetails.value = Object.fromEntries(results.filter(Boolean))
+}, { immediate: true })
+
 const monthBars = computed(() =>
   MONTH_NAMES.map((label, i) => ({
     label,
@@ -236,6 +263,8 @@ const yearLabelEvery = computed(() => Math.max(1, Math.ceil(yearBars.value.lengt
 const institutionRows = computed(() =>
   institutions.value.slice(0, MAX_INSTITUTIONS).map((c) => ({
     label: c.name,
+    href: institutionDetails.value[c.name]?.href,
+    title: institutionDetails.value[c.name]?.title,
     tw: c.tw,
     gbif: c.gbif
   }))

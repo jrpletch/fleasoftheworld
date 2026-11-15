@@ -174,6 +174,7 @@ function fitTo(bounds) {
 function onGeojsonReady() {
   isLoading.value = false
   isFocused.value = false
+  observeResize()
 
   const geojson = store.distribution.geojson
   const focus = getSpecimenFocusBounds(geojson)
@@ -186,7 +187,26 @@ function onGeojsonReady() {
   setTimeout(() => {
     fitTo(bounds)
     isFocused.value = !!focus
+    isViewInitialized = true
   }, 200)
+}
+
+// VMap refits to all shapes on every container resize (e.g. the page reflowing
+// when the image viewer closes); restore the view the user had before it.
+let isViewInitialized = false
+let resizeObserver = null
+
+function observeResize() {
+  const el = mapRef.value?.$el
+  if (!el || resizeObserver) return
+  resizeObserver = new ResizeObserver(() => {
+    const map = mapRef.value?.getMapObject?.()
+    if (!map || !isViewInitialized) return
+    const center = map.getCenter()
+    const mapZoom = map.getZoom()
+    setTimeout(() => map.setView(center, mapZoom, { animate: false }), 50)
+  })
+  resizeObserver.observe(el)
 }
 
 function showAll() {
@@ -207,6 +227,7 @@ const { popupItem, geojsonOptions } = useGeojsonOptions({ popupElement })
 
 onMounted(() => {
   isLoading.value = true
+  observeResize()
 
   store.loadDistribution({
     otuId: props.otuId,
@@ -215,6 +236,7 @@ onMounted(() => {
 })
 
 onBeforeUnmount(() => {
+  resizeObserver?.disconnect()
   store.resetRequest()
   store.$reset()
 })
