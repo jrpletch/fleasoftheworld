@@ -9,9 +9,18 @@
     "build:ssr": "taxonpages build:ssr",
     "serve": "taxonpages serve",
     "preview": "taxonpages preview",
-    "setup": "taxonpages setup"
+    "setup": "taxonpages setup",
+    "test:browser": "playwright test",
+    "test:browser:ui": "playwright test --ui --ui-host=127.0.0.1 --ui-port=9323",
+    "test:browser:report": "playwright show-report"
   },
   "dependencies": {
-    "@sfgrp/taxonpages": "latest"
+    "@sfgrp/taxonpages": "latest",
+    "pdf-lib": "^1.17.1",
+    "pdfjs-dist": "^6.5.438",
+    "tesseract.js": "^7.0.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.1"
   }
 }
