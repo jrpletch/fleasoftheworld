@@ -13,17 +13,8 @@
           link: /taxonomy
         - label: Checklists
           link: /checklists
-        - label: Search DwC
+        - label: Specimen data
           link: /resources/tw/filter/dwc_otus
-        - label: Siphonapterists
-          link: /siphonapterists
-
-    - label: Guides
-      submenu:
-        - label: Techniques
-          link: /techniques
-        - label: Morphology
-          link: /morphology
 
     - label: Resources
       submenu:
@@ -31,8 +22,8 @@
           link: /resources/tw/filter/bibliography
         - label: Flea collections
           link: /collections
-        - label: PDF processor
-          link: /pdf-processor
+        - label: Siphonapterists
+          link: /siphonapterists
 
     - label: Flea News
       link: /fleanews

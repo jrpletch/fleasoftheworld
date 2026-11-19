@@ -94,8 +94,6 @@ const specimenImageUrl = `${base_url}images/Barreropsylla_excelsa_RDS-16914_10X.
 
 const quickLinks = [
   { label: 'Checklists', to: '/checklists', icon: 'pin' },
-  { label: 'Techniques', to: '/techniques', icon: 'document' },
-  { label: 'Keys', to: '/keys', icon: 'key' },
   { label: 'Bibliography', to: '/resources/tw/filter/bibliography', icon: 'book' },
   { label: 'Specimen data', to: '/resources/tw/filter/dwc_otus', icon: 'database' }
 ]

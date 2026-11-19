@@ -140,6 +140,7 @@ const MIN_REFS = 3
 const BADGE = {
   taxa: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-400/15 dark:text-emerald-300',
   refs: 'bg-primary-color/10 text-primary-color dark:bg-secondary-color/15 dark:text-secondary-color',
+  fleaNews: 'bg-violet-100 text-violet-800 dark:bg-violet-400/15 dark:text-violet-300',
   people: 'bg-amber-100 text-amber-800 dark:bg-amber-400/15 dark:text-amber-300'
 }
 
@@ -152,11 +153,13 @@ const activeIndex = ref(-1)
 
 const taxa = ref([])
 const refs = ref([])
+const fleaNews = ref([])
 const people = ref([])
-const loading = ref({ taxa: false, refs: false, people: false })
+const loading = ref({ taxa: false, refs: false, fleaNews: false, people: false })
 
 let timer = null
 let requestId = 0
+let archiveDataPromise = null
 
 const stripTags = (s) => String(s || '').replace(/<[^>]*>/g, '').replace(/&amp;/g, '&')
 const escapeHtml = (s) =>
@@ -165,7 +168,81 @@ const escapeHtml = (s) =>
 function clearResults() {
   taxa.value = []
   refs.value = []
+  fleaNews.value = []
   people.value = []
+}
+
+function loadArchiveRecords() {
+  if (!archiveDataPromise) {
+    archiveDataPromise = Promise.all([
+      import('../../data/fleaNewsIssuesWithText.json'),
+      import('../../data/relatedPublicationsWithText.json')
+    ]).then(([issueModule, publicationModule]) => [
+      ...issueModule.default.map((issue) => ({
+        key: `fn${issue.issue}-${issue.year}`,
+        label: `Flea News · Number ${issue.issue} · ${issue.month} ${issue.year}`,
+        meta: issue.editor ? `Editor: ${issue.editor}` : '',
+        year: issue.year,
+        url: issue.pdf,
+        text: issue.text || ''
+      })),
+      ...publicationModule.default.map((publication) => ({
+        key: `pub-${publication.id}`,
+        label: `${publication.title} · ${publication.year}`,
+        meta: publication.authors || '',
+        year: publication.year,
+        url: publication.pdf,
+        text: publication.text || ''
+      }))
+    ])
+  }
+  return archiveDataPromise
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function highlightMatch(value, query) {
+  const pattern = new RegExp(`(${escapeRegExp(query)})`, 'gi')
+  return escapeHtml(value).replace(pattern, '<mark>$1</mark>')
+}
+
+function archiveSnippet(text, query) {
+  const index = text.toLocaleLowerCase().indexOf(query.toLocaleLowerCase())
+  if (index < 0) return ''
+  const start = Math.max(0, index - 55)
+  const end = Math.min(text.length, index + query.length + 85)
+  return `${start ? '…' : ''}${text.slice(start, end)}${end < text.length ? '…' : ''}`
+}
+
+function searchArchive(records, query) {
+  const normalizedQuery = query.toLocaleLowerCase()
+  return records.flatMap((record) => {
+    const searchable = `${record.label}\n${record.meta}\n${record.text}`
+    const normalizedSearchable = searchable.toLocaleLowerCase()
+    const firstMatch = normalizedSearchable.indexOf(normalizedQuery)
+    if (firstMatch < 0) return []
+
+    let count = 0
+    let offset = firstMatch
+    while (offset >= 0 && count < 100) {
+      count += 1
+      offset = normalizedSearchable.indexOf(normalizedQuery, offset + normalizedQuery.length)
+    }
+
+    const titleMatch = record.label.toLocaleLowerCase().includes(normalizedQuery)
+    const snippet = archiveSnippet(record.text, query) || archiveSnippet(`${record.label} ${record.meta}`, query)
+    return [{
+      key: record.key,
+      type: 'fleaNews',
+      html: highlightMatch(record.label, query),
+      sub: highlightMatch(snippet, query),
+      url: record.url,
+      score: (titleMatch ? 1000 : 0) + Math.min(count, 100),
+      year: record.year
+    }]
+  }).sort((a, b) => b.score - a.score || b.year - a.year).slice(0, 5)
 }
 
 async function search(q, id) {
@@ -192,6 +269,7 @@ async function search(q, id) {
 
   if (!props.taxaOnly && q.length >= MIN_REFS) {
     loading.value.refs = true
+    loading.value.fleaNews = true
     loading.value.people = true
 
     tasks.push(
@@ -215,6 +293,18 @@ async function search(q, id) {
             }))
         })
         .finally(() => id === requestId && (loading.value.refs = false))
+    )
+
+    tasks.push(
+      loadArchiveRecords()
+        .then((records) => {
+          if (id !== requestId) return
+          fleaNews.value = searchArchive(records, q)
+        })
+        .catch(() => {
+          if (id === requestId) fleaNews.value = []
+        })
+        .finally(() => id === requestId && (loading.value.fleaNews = false))
     )
 
     tasks.push(
@@ -255,7 +345,7 @@ watch(term, (value) => {
 
   if (q.length < MIN_TAXA) {
     clearResults()
-    loading.value = { taxa: false, refs: false, people: false }
+    loading.value = { taxa: false, refs: false, fleaNews: false, people: false }
     return
   }
 
@@ -263,6 +353,7 @@ watch(term, (value) => {
   loading.value = {
     taxa: true,
     refs: !props.taxaOnly && q.length >= MIN_REFS,
+    fleaNews: !props.taxaOnly && q.length >= MIN_REFS,
     people: !props.taxaOnly && q.length >= MIN_REFS
   }
 
@@ -277,6 +368,7 @@ const sections = computed(() => {
   return [
     { key: 'taxa', title: 'Taxa', badge: 'T', items: withIndex(taxa.value), loading: loading.value.taxa },
     { key: 'refs', title: 'References', badge: 'R', items: withIndex(refs.value), loading: loading.value.refs },
+    { key: 'fleaNews', title: 'Flea News & Publications', badge: 'F', items: withIndex(fleaNews.value), loading: loading.value.fleaNews },
     { key: 'people', title: 'People', badge: 'P', items: withIndex(people.value), loading: loading.value.people }
   ]
 })
@@ -299,6 +391,8 @@ function choose(item) {
     router.push({ name: 'otus-id-overview', params: { id: item.otuId } })
   } else if (item.type === 'refs') {
     router.push({ path: '/resources/tw/filter/bibliography', query: { query_term: item.title } })
+  } else if (item.type === 'fleaNews') {
+    window.open(item.url, '_blank', 'noopener,noreferrer')
   } else if (item.type === 'people') {
     router.push({ path: '/resources/tw/filter/bibliography', query: { author: item.lastName } })
   }

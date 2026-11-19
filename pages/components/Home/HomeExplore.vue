@@ -48,24 +48,6 @@ const cards = [
     cta: 'Browse checklists'
   },
   {
-    to: '/techniques',
-    title: 'Flea techniques',
-    text: 'Practical guidance on collecting fleas, mounting specimens, and extracting DNA.',
-    cta: 'Browse techniques'
-  },
-  {
-    to: '/morphology',
-    title: 'Morphology',
-    text: 'Explore flea morphology.',
-    cta: 'Explore morphology'
-  },
-  {
-    to: '/keys',
-    title: 'Identification keys',
-    text: 'Interactive dichotomous keys you can step through couplet by couplet, filtered by region.',
-    cta: 'Browse keys'
-  },
-  {
     to: '/resources/tw/filter/dwc_otus',
     title: 'Specimen & occurrence data',
     text: 'Query Darwin Core records and download specimen data for any taxon in the database.',
@@ -76,12 +58,6 @@ const cards = [
     title: 'Bibliography',
     text: 'Search the literature on Siphonaptera by author, year, title or taxon, and request PDFs you cannot access.',
     cta: 'Search literature'
-  },
-  {
-    to: '/request-pdf',
-    title: 'Request a PDF',
-    text: 'Ask us about a publication you cannot access. Include its citation or DOI and we’ll follow up if a copy is available.',
-    cta: 'Request a paper'
   },
   {
     to: '/siphonapterists',
@@ -95,17 +71,5 @@ const cards = [
     text: 'Browse newsletter issues by year or search their text for flea-related publications and topics.',
     cta: 'Browse Flea News'
   },
-  {
-    to: '/RecentTaxa',
-    title: 'Recently added taxa',
-    text: 'The latest names described or added to Fleas of the World, so you can keep up with new taxonomy.',
-    cta: 'See what’s new'
-  },
-  {
-    to: '/RecentReferences',
-    title: 'Latest references',
-    text: 'Publications most recently entered into the database and linked to their taxa.',
-    cta: 'View additions'
-  }
 ]
 </script>

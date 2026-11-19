@@ -25,7 +25,7 @@
 
     <!-- Controls -->
     <div class="max-w-5xl mx-auto px-6 py-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-      <div>
+      <div class="flex flex-wrap items-center gap-3">
         <label for="year-select" class="mr-2 font-medium">Select Year:</label>
         <select
           id="year-select"
@@ -37,6 +37,15 @@
             {{ year }}
           </option>
         </select>
+        <button
+          v-if="!selectedYear && !searchQuery"
+          type="button"
+          @click="showRelatedPublications = !showRelatedPublications"
+          class="px-3 py-2 border rounded bg-base-background hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-black"
+          :aria-expanded="showRelatedPublications"
+        >
+          {{ showRelatedPublications ? 'Show Flea News' : 'Show Publications' }}
+        </button>
       </div>
 
       <input
@@ -54,6 +63,7 @@
 	<div
       class="max-w-5xl mx-auto px-6 py-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"
     >
+      <template v-if="!showRelatedPublications || selectedYear">
       <a
         v-for="issue in paginatedTiles"
         :key="`${issue.year}-${issue.month}-${issue.issue}`"
@@ -75,11 +85,31 @@
           Editor: {{ issue.editor }}
         </div>
       </a>
+      </template>
+
+      <template v-if="selectedYear || showRelatedPublications">
+        <a
+          v-for="publication in filteredRelatedPublications"
+          :key="publication.id"
+          :href="publication.pdf"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="bg-base-foreground rounded-xl shadow p-4 flex flex-col hover:shadow-lg hover:-translate-y-1 transition transform focus:outline-none focus:ring-2 focus:ring-black"
+        >
+          <img
+            :src="publication.thumbnail"
+            :alt="`Cover of ${publication.title}`"
+            class="w-full object-contain mb-3 rounded bg-gray-100"
+          />
+          <div class="font-semibold text-lg mb-1">{{ publication.title }}</div>
+          <div class="text-gray-500 text-sm">{{ publication.year }} &middot; {{ publication.authors }}</div>
+        </a>
+      </template>
     </div>
 	
 	<!--Pagination-->
 	<div
-      v-if="totalPages > 1"
+      v-if="totalPages > 1 && (!showRelatedPublications || selectedYear)"
       class="max-w-5xl mx-auto px-6 py-6 flex justify-center items-center gap-2">
       <button
         @click="currentPage--"
@@ -106,6 +136,8 @@
         Next
       </button>
     </div>
+
+
 </div>
 
     <!-- SEARCH RESULTS -->
@@ -115,16 +147,19 @@
     >
       <div
         v-for="row in searchResults"
-        :key="`${row.year}-${row.month}-${row.issue}`"
+        :key="row.searchId"
         class="bg-white rounded-xl shadow p-4"
       >
         <div class="flex items-center justify-between">
           <div>
-            <span class="text-black font-semibold">
+            <span v-if="row.kind === 'publication'" class="text-black font-semibold">
+              {{ row.title }} · {{ row.year }}
+            </span>
+            <span v-else class="text-black font-semibold">
               {{ row.year }} {{ row.month }} · Number {{ row.issue }}
             </span>
             <span class="text-gray-500 ml-2">
-              Editor: {{ row.editor }}
+              {{ row.kind === 'publication' ? row.authors : `Editor: ${row.editor}` }}
             </span>
           </div>
           <a
@@ -132,7 +167,7 @@
             target="_blank"
             class="px-3 py-1 bg-black text-white rounded hover:bg-gray-800 transition"
           >
-            View PDF
+            View {{ row.kind === 'publication' ? 'Publication' : 'PDF' }}
           </a>
         </div>
 
@@ -159,10 +194,12 @@
 <script setup>
 import { ref, computed, watch } from 'vue'
 import issues from './data/fleaNewsIssuesWithText.json'
+import relatedPublications from './data/relatedPublicationsWithText.json'
 
 const searchInput = ref('')
 const searchQuery = ref('')
 const selectedYear = ref('')
+const showRelatedPublications = ref(false)
 
 const currentPage = ref(1)
 const perPage = 24
@@ -184,6 +221,7 @@ watch(searchInput, (val) => {
 
 watch(selectedYear, () => {
 	currentPage.value = 1
+	showRelatedPublications.value = false
 })
 
 const monthOrder = {
@@ -203,9 +241,28 @@ const sortedIssues = [...issues].sort((a, b) => {
   return b.issue - a.issue
 })
 
+const searchDocuments = [
+  ...sortedIssues.map(issue => ({
+    ...issue,
+    kind: 'issue',
+    searchId: `flea-news-${issue.issue}-${issue.year}`
+  })),
+  ...relatedPublications.map(publication => ({
+    ...publication,
+    kind: 'publication',
+    searchId: publication.id
+  }))
+].sort((a, b) => b.year - a.year)
+
 const uniqueYears = computed(() => {
-  const years = [...new Set(sortedIssues.map(i => i.year))]
+  const years = [...new Set(searchDocuments.map(document => document.year))]
   return years.sort((a, b) => b - a)
+})
+
+const filteredRelatedPublications = computed(() => {
+  return relatedPublications.filter(
+    publication => !selectedYear.value || publication.year === Number(selectedYear.value)
+  )
 })
 
 const filteredIssues = computed(() => {
@@ -299,15 +356,18 @@ const searchResults = computed(() => {
   const q = searchQuery.value.toLowerCase()
   const results = []
 
-  sortedIssues.forEach(issue => {
-    if (selectedYear.value && issue.year !== Number(selectedYear.value)) return
-    if (!issue.text || !issue.text.toLowerCase().includes(q)) return
+  searchDocuments.forEach(document => {
+    if (selectedYear.value && document.year !== Number(selectedYear.value)) return
+    const searchableText = [document.title, document.authors, document.publisher, document.text]
+      .filter(Boolean)
+      .join('\n')
+    if (!searchableText.toLowerCase().includes(q)) return
 
-    const snippets = extractSnippets(issue.text, searchQuery.value)
+    const snippets = extractSnippets(searchableText, searchQuery.value)
 
     if (snippets.length) {
       results.push({
-        ...issue,
+        ...document,
         snippets
       })
     }
